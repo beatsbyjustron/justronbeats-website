@@ -1,0 +1,27 @@
+import { ArtistTicker } from "@/components/artist-ticker";
+import { BeatStore } from "@/components/beat-store";
+import { FeaturedCarousel } from "@/components/featured-carousel";
+import { fetchBeats, mapFeaturedProductions } from "@/lib/beats";
+
+export default async function HomePage() {
+  const beats = await fetchBeats();
+  const featuredProductions = mapFeaturedProductions(beats);
+
+  return (
+    <main className="space-y-12">
+      <section className="max-w-3xl space-y-4">
+        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Beat Store</p>
+        <h1 className="text-4xl font-bold text-zinc-100 sm:text-5xl">Official Store for Justron Beats</h1>
+        <p className="text-zinc-400">Browse beats. Own your sound.</p>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Produced For</p>
+        <ArtistTicker />
+      </section>
+
+      <FeaturedCarousel productions={featuredProductions} />
+      <BeatStore beats={beats} initiallyVisible={4} />
+    </main>
+  );
+}
