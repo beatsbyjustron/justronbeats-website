@@ -1,19 +1,18 @@
 import { randomUUID } from "crypto";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
 
-const BUCKET = process.env.SUPABASE_STORAGE_BUCKET ?? process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "beats";
+const BUCKET: string = process.env.SUPABASE_STORAGE_BUCKET ?? process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "beats";
 
 function fileExt(name: string) {
   const parts = name.split(".");
   return parts.length > 1 ? parts[parts.length - 1] : "bin";
 }
 
-type SupabaseClient = ReturnType<typeof createClient>;
-
-async function uploadFile(supabase: SupabaseClient, file: File, folder: string) {
+async function uploadFile(supabase: SupabaseClient<Database>, file: File, folder: string) {
   const extension = fileExt(file.name);
   const path = `${folder}/${randomUUID()}.${extension}`;
   const arrayBuffer = await file.arrayBuffer();
@@ -44,7 +43,7 @@ export async function POST(request: Request) {
     if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
     }
-    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+    const supabase = createClient<Database>(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
     const title = String(formData.get("title") ?? "");
     const producerCredits = String(formData.get("producerCredits") ?? "");
@@ -74,8 +73,16 @@ export async function POST(request: Request) {
 
     const folder = `${title.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
     const [coverArtUrl, mp3Url] = await Promise.all([uploadFile(supabase, coverArt, folder), uploadFile(supabase, mp3File, folder)]);
-    const wavUrl = hasWav ? await uploadFile(supabase, wavFile, folder) : null;
-    const stemsUrl = hasStems ? await uploadFile(supabase, stemsFile, folder) : null;
+
+    let wavUrl: string | null = null;
+    if (hasWav && wavFile instanceof File) {
+      wavUrl = await uploadFile(supabase, wavFile, folder);
+    }
+
+    let stemsUrl: string | null = null;
+    if (hasStems && stemsFile instanceof File) {
+      stemsUrl = await uploadFile(supabase, stemsFile, folder);
+    }
 
     const { error } = await supabase.from("beats").insert({
       title,

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
     }
-    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+    const supabase = createClient<Database>(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
     const { error } = await supabase.from("beat_offers").insert({
       beat_id: beatId,

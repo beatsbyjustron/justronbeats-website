@@ -1,12 +1,13 @@
 import "server-only";
 import { loadEnvConfig } from "@next/env";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 function normalize(value: string | undefined) {
   return value?.trim().replace(/^['"]|['"]$/g, "");
 }
 
-export function getSupabaseServerClient() {
+export function getSupabaseServerClient(): SupabaseClient<Database> | null {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
     loadEnvConfig(process.cwd());
   }
@@ -21,7 +22,7 @@ export function getSupabaseServerClient() {
     return null;
   }
 
-  return createClient(url, serviceRoleKey, {
+  return createClient<Database>(url, serviceRoleKey, {
     auth: {
       persistSession: false
     }
