@@ -72,6 +72,16 @@ export async function fetchBeats(): Promise<Beat[]> {
   return (data as BeatRow[]).map(mapBeat);
 }
 
+export async function fetchBeatById(id: string): Promise<Beat | null> {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.from("beats").select("*").eq("id", id).single();
+  if (error || !data) return null;
+
+  return mapBeat(data as BeatRow);
+}
+
 export function mapFeaturedProductions(beats: Beat[]): FeaturedProduction[] {
   return beats
     .filter((beat) => beat.featured)
