@@ -7,6 +7,7 @@ import type { Database } from "@/types/database";
 export const runtime = "nodejs";
 
 const BUCKET: string = process.env.SUPABASE_STORAGE_BUCKET ?? process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "beats";
+const ADMIN_PASSWORD = process.env.ADMIN_PANEL_PASSWORD ?? "justron-admin";
 
 function fileExt(name: string) {
   const parts = name.split(".");
@@ -29,22 +30,137 @@ async function uploadFile(supabase: SupabaseClient<Database>, file: File, folder
   return data.publicUrl;
 }
 
+function getSupabaseAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    return null;
+  }
+  return createClient<Database>(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+}
+
+function hasValidAdminPassword(request: Request) {
+  const headerPassword = request.headers.get("x-admin-password");
+  return headerPassword === ADMIN_PASSWORD;
+}
+
+export async function GET(request: Request) {
+  if (!hasValidAdminPassword(request)) {
+    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
+  }
+
+  const { data, error } = await supabase
+    .from("beats")
+    .select("id, title, producer_credits, key, bpm, tags, featured, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ beats: data ?? [] });
+}
+
+export async function PATCH(request: Request) {
+  if (!hasValidAdminPassword(request)) {
+    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
+  }
+
+  try {
+    const body = (await request.json()) as {
+      id?: string;
+      title?: string;
+      producerCredits?: string;
+      key?: string;
+      bpm?: number;
+      tags?: string[];
+      featured?: boolean;
+    };
+
+    const id = String(body.id ?? "").trim();
+    if (!id) {
+      return NextResponse.json({ error: "Beat id is required." }, { status: 400 });
+    }
+
+    const title = String(body.title ?? "").trim();
+    if (!title) {
+      return NextResponse.json({ error: "Title is required." }, { status: 400 });
+    }
+
+    const payload = {
+      title,
+      producer_credits: String(body.producerCredits ?? "").trim(),
+      key: String(body.key ?? "").trim() || "Unknown",
+      bpm: Number.isFinite(Number(body.bpm)) ? Math.max(0, Number(body.bpm)) : 0,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      featured: Boolean(body.featured)
+    };
+
+    const { error } = await supabase.from("beats").update(payload).eq("id", id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    revalidatePath("/");
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Update failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!hasValidAdminPassword(request)) {
+    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
+  }
+
+  try {
+    const body = (await request.json()) as { id?: string };
+    const id = String(body.id ?? "").trim();
+    if (!id) {
+      return NextResponse.json({ error: "Beat id is required." }, { status: 400 });
+    }
+
+    const { error } = await supabase.from("beats").delete().eq("id", id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    revalidatePath("/");
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Delete failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const password = String(formData.get("password") ?? "");
-    const expectedPassword = process.env.ADMIN_PANEL_PASSWORD ?? "justron-admin";
-
-    if (password !== expectedPassword) {
+    if (password !== ADMIN_PASSWORD) {
       return NextResponse.json({ error: "Invalid password" }, { status: 401 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseKey) {
+    const supabase = getSupabaseAdminClient();
+    if (!supabase) {
       return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
     }
-    const supabase = createClient<Database>(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
     const title = String(formData.get("title") ?? "");
     const producerCredits = String(formData.get("producerCredits") ?? "");

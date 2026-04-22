@@ -12,6 +12,15 @@ type Status = {
 type UploadKey = "coverArt" | "mp3" | "wav" | "stems";
 type UploadStage = "idle" | "queued" | "uploading" | "done" | "skipped" | "error";
 type UploadProgress = Record<UploadKey, UploadStage>;
+type AdminBeat = {
+  id: string;
+  title: string;
+  producer_credits: string | null;
+  key: string;
+  bpm: number;
+  tags: string[];
+  featured: boolean;
+};
 
 const initialStatus: Status = { type: "idle", message: "" };
 const initialUploadProgress: UploadProgress = {
@@ -48,6 +57,20 @@ export default function AdminUploadPage() {
   const [stemsFile, setStemsFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>(initialUploadProgress);
+  const [beats, setBeats] = useState<AdminBeat[]>([]);
+  const [isLoadingBeats, setIsLoadingBeats] = useState(false);
+  const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deletingBeatId, setDeletingBeatId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    producerCredits: "",
+    key: "",
+    bpm: "",
+    tags: "",
+    featured: false
+  });
+  const [editStatus, setEditStatus] = useState<Status>(initialStatus);
 
   const expectedPassword = useMemo(() => process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD ?? "justron-admin", []);
 
@@ -66,15 +89,49 @@ export default function AdminUploadPage() {
     return () => clearTimeout(timeout);
   }, [router, status.type]);
 
+  const loadBeats = async () => {
+    setIsLoadingBeats(true);
+    setEditStatus(initialStatus);
+    try {
+      const password = gatePassword || formPassword;
+      const response = await fetch("/api/admin/beats", {
+        method: "GET",
+        headers: {
+          "x-admin-password": password
+        }
+      });
+
+      const result = (await response.json()) as { error?: string; beats?: AdminBeat[] };
+      if (!response.ok) {
+        setEditStatus({ type: "error", message: result.error ?? "Failed to fetch beats." });
+        setIsLoadingBeats(false);
+        return;
+      }
+
+      setBeats(result.beats ?? []);
+      setIsLoadingBeats(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to fetch beats.";
+      setEditStatus({ type: "error", message });
+      setIsLoadingBeats(false);
+    }
+  };
+
   const unlock = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (gatePassword === expectedPassword) {
       setIsUnlocked(true);
+      setFormPassword(gatePassword);
       setStatus(initialStatus);
       return;
     }
     setStatus({ type: "error", message: "Incorrect password." });
   };
+
+  useEffect(() => {
+    if (!isUnlocked) return;
+    void loadBeats();
+  }, [isUnlocked]);
 
   const uploadToBeatsBucket = async (file: File, folder: string) => {
     if (!supabase) throw new Error("Supabase client is not configured.");
@@ -175,12 +232,104 @@ export default function AdminUploadPage() {
       setFileInputKey((prev) => prev + 1);
       setUploadProgress(initialUploadProgress);
       setStatus({ type: "success", message: "Successfully Uploaded to the Store" });
+      void loadBeats();
       setIsSubmitting(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown upload error";
       alert(`Supabase upload rejected: ${message}`);
       setStatus({ type: "error", message });
       setIsSubmitting(false);
+    }
+  };
+
+  const beginEdit = (beat: AdminBeat) => {
+    setEditingBeatId(beat.id);
+    setEditStatus(initialStatus);
+    setEditForm({
+      title: beat.title,
+      producerCredits: beat.producer_credits ?? "",
+      key: beat.key === "Unknown" ? "" : beat.key,
+      bpm: beat.bpm ? String(beat.bpm) : "",
+      tags: beat.tags.join(", "),
+      featured: beat.featured
+    });
+  };
+
+  const saveEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingBeatId) return;
+
+    setIsSavingEdit(true);
+    setEditStatus(initialStatus);
+    try {
+      const response = await fetch("/api/admin/beats", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": gatePassword || formPassword
+        },
+        body: JSON.stringify({
+          id: editingBeatId,
+          title: editForm.title.trim(),
+          producerCredits: editForm.producerCredits.trim(),
+          key: editForm.key.trim(),
+          bpm: Number(editForm.bpm || 0),
+          tags: editForm.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          featured: editForm.featured
+        })
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setEditStatus({ type: "error", message: result.error ?? "Failed to update beat." });
+        setIsSavingEdit(false);
+        return;
+      }
+
+      setEditStatus({ type: "success", message: "Beat updated successfully." });
+      setEditingBeatId(null);
+      await loadBeats();
+      setIsSavingEdit(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update beat.";
+      setEditStatus({ type: "error", message });
+      setIsSavingEdit(false);
+    }
+  };
+
+  const deleteBeat = async (id: string) => {
+    const confirmed = window.confirm("Delete this beat permanently?");
+    if (!confirmed) return;
+
+    setDeletingBeatId(id);
+    setEditStatus(initialStatus);
+    try {
+      const response = await fetch("/api/admin/beats", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": gatePassword || formPassword
+        },
+        body: JSON.stringify({ id })
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setEditStatus({ type: "error", message: result.error ?? "Failed to delete beat." });
+        setDeletingBeatId(null);
+        return;
+      }
+
+      setEditStatus({ type: "success", message: "Beat deleted successfully." });
+      await loadBeats();
+      setDeletingBeatId(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete beat.";
+      setEditStatus({ type: "error", message });
+      setDeletingBeatId(null);
     }
   };
 
@@ -362,6 +511,130 @@ export default function AdminUploadPage() {
           </div>
         </div>
       )}
+
+      <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-zinc-100">Uploaded Beats</h2>
+          <button
+            type="button"
+            onClick={() => void loadBeats()}
+            className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-200 transition hover:border-zinc-500"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {editStatus.message && (
+          <p className={editStatus.type === "error" ? "text-sm text-red-400" : "text-sm text-emerald-400"}>
+            {editStatus.message}
+          </p>
+        )}
+
+        {isLoadingBeats ? (
+          <p className="text-sm text-zinc-400">Loading beats...</p>
+        ) : !beats.length ? (
+          <p className="text-sm text-zinc-400">No beats uploaded yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {beats.map((beat) => (
+              <article key={beat.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                {editingBeatId === beat.id ? (
+                  <form onSubmit={saveEdit} className="grid gap-3">
+                    <input
+                      value={editForm.title}
+                      onChange={(event) => setEditForm((prev) => ({ ...prev, title: event.target.value }))}
+                      placeholder="Beat title"
+                      required
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                    />
+                    <input
+                      value={editForm.producerCredits}
+                      onChange={(event) => setEditForm((prev) => ({ ...prev, producerCredits: event.target.value }))}
+                      placeholder="Collaborators"
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input
+                        value={editForm.key}
+                        onChange={(event) => setEditForm((prev) => ({ ...prev, key: event.target.value }))}
+                        placeholder="Key"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                      <input
+                        type="number"
+                        value={editForm.bpm}
+                        onChange={(event) => setEditForm((prev) => ({ ...prev, bpm: event.target.value }))}
+                        placeholder="BPM"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                    </div>
+                    <input
+                      value={editForm.tags}
+                      onChange={(event) => setEditForm((prev) => ({ ...prev, tags: event.target.value }))}
+                      placeholder="Tags (comma separated)"
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={editForm.featured}
+                        onChange={(event) => setEditForm((prev) => ({ ...prev, featured: event.target.checked }))}
+                        className="size-4 accent-zinc-100"
+                      />
+                      Featured on homepage carousel
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={isSavingEdit}
+                        className="rounded-full bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:opacity-60"
+                      >
+                        {isSavingEdit ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingBeatId(null)}
+                        className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition hover:border-zinc-500"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="font-medium text-zinc-100">{beat.title}</p>
+                      <p className="text-xs text-zinc-400">{beat.producer_credits || "No collaborators listed"}</p>
+                      <p className="text-xs text-zinc-500">
+                        {beat.bpm || 0} BPM • {beat.key || "Unknown"}
+                      </p>
+                      <p className="text-xs text-zinc-500">{beat.tags.length ? beat.tags.join(", ") : "No tags"}</p>
+                      {beat.featured && <p className="text-xs text-emerald-400">Featured</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => beginEdit(beat)}
+                        className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-200 transition hover:border-zinc-500"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteBeat(beat.id)}
+                        disabled={deletingBeatId === beat.id}
+                        className="rounded-full border border-red-500/60 px-4 py-2 text-xs text-red-300 transition hover:bg-red-950/60 disabled:opacity-60"
+                      >
+                        {deletingBeatId === beat.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
