@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -109,6 +110,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidatePath("/");
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload failed";

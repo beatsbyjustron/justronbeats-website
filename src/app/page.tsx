@@ -3,6 +3,8 @@ import { BeatStore } from "@/components/beat-store";
 import { FeaturedCarousel } from "@/components/featured-carousel";
 import { fetchBeats, mapFeaturedProductions } from "@/lib/beats";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const beats = await fetchBeats();
   const featuredProductions = mapFeaturedProductions(beats);

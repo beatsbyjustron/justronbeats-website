@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Status = {
   type: "idle" | "error" | "success";
@@ -18,6 +19,7 @@ const initialUploadForm = {
 };
 
 export default function AdminPage() {
+  const router = useRouter();
   const [gatePassword, setGatePassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,6 +33,15 @@ export default function AdminPage() {
   const [fileInputKey, setFileInputKey] = useState(0);
 
   const expectedPassword = useMemo(() => process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD ?? "justron-admin", []);
+
+  useEffect(() => {
+    if (status.type !== "success") return;
+    const timeout = setTimeout(() => {
+      router.push("/");
+    }, 1800);
+
+    return () => clearTimeout(timeout);
+  }, [router, status.type]);
 
   const unlock = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -84,7 +95,7 @@ export default function AdminPage() {
     setWavFile(null);
     setStemsFile(null);
     setFileInputKey((prev) => prev + 1);
-    setStatus({ type: "success", message: "Beat uploaded successfully." });
+    setStatus({ type: "success", message: "Successfully Uploaded to the Store" });
     setIsSubmitting(false);
   };
 
@@ -243,8 +254,21 @@ export default function AdminPage() {
         </button>
       </form>
 
-      {status.message && (
-        <p className={status.type === "error" ? "text-sm text-red-400" : "text-sm text-emerald-400"}>{status.message}</p>
+      {status.message && status.type === "error" && <p className="text-sm text-red-400">{status.message}</p>}
+      {status.message && status.type === "success" && (
+        <div className="space-y-3 rounded-xl border border-emerald-500/50 bg-emerald-950/40 p-4">
+          <p className="text-sm font-medium text-emerald-300">{status.message}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="rounded-full border border-emerald-400/50 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-900/50"
+            >
+              Return to Home
+            </button>
+            <p className="text-xs text-emerald-300/80">Redirecting shortly...</p>
+          </div>
+        </div>
       )}
     </main>
   );
