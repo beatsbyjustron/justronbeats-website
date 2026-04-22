@@ -340,8 +340,8 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
             />
           </div>
 
-          <div className="px-4 py-3">
-            <div className="flex items-center gap-3 overflow-x-auto">
+          <div className="overflow-x-auto px-4 py-3">
+            <div className="mx-auto flex w-max items-center gap-3">
               <img
                 src={currentBeat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
                 alt={currentBeat.title}
