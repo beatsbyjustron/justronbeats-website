@@ -350,21 +350,21 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
             />
           </div>
 
-          <div className="overflow-x-auto px-4 py-3">
-            <div className="mx-auto flex w-max items-center gap-3">
+          <div className="px-3 py-2.5 sm:px-4 sm:py-3">
+            <div className="mx-auto flex w-full max-w-6xl items-center gap-2 sm:gap-3">
               <img
                 src={currentBeat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
                 alt={currentBeat.title}
-                className="h-11 w-11 rounded-md object-cover"
+                className="h-9 w-9 rounded-md object-cover sm:h-11 sm:w-11"
               />
-              <div className="min-w-0 max-w-[220px]">
-                <p className="truncate text-sm font-medium text-zinc-100">{currentBeat.title}</p>
-                <p className="text-[11px] text-zinc-500">
+              <div className="min-w-0 max-w-[130px] sm:max-w-[220px]">
+                <p className="truncate text-xs font-medium text-zinc-100 sm:text-sm">{currentBeat.title}</p>
+                <p className="text-[10px] text-zinc-500 sm:text-[11px]">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </p>
               </div>
 
-              <div className="ml-1 flex h-8 items-end gap-1">
+              <div className="ml-1 hidden h-8 items-end gap-1 sm:flex">
                 {visualizerLevels.slice(0, 18).map((height, index) => (
                   <span
                     key={`bottom-bar-${index}-${height}`}
@@ -376,30 +376,30 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
                 ))}
               </div>
 
-              <div className="ml-2 flex items-center gap-2">
+              <div className="ml-auto flex items-center gap-1.5 sm:ml-2 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => void playPrevious()}
                   disabled={!hasPrevious}
-                  className="rounded-full border border-zinc-700 p-2 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full border border-zinc-700 p-1.5 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 sm:p-2"
                   aria-label="Previous beat"
                 >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="currentColor" aria-hidden="true">
                     <path d="M6 6h2v12H6zM18 6v12l-8-6z" />
                   </svg>
                 </button>
                 <button
                   type="button"
                   onClick={() => void togglePlayPause()}
-                  className="rounded-full bg-zinc-100 p-2 text-zinc-900 transition hover:bg-zinc-200"
+                  className="rounded-full bg-zinc-100 p-1.5 text-zinc-900 transition hover:bg-zinc-200 sm:p-2"
                   aria-label={isPlaying ? "Pause playback" : "Play playback"}
                 >
                   {isPlaying ? (
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="currentColor" aria-hidden="true">
                       <path d="M7 6h4v12H7zM13 6h4v12h-4z" />
                     </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="currentColor" aria-hidden="true">
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   )}
@@ -408,16 +408,16 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
                   type="button"
                   onClick={() => void playNext()}
                   disabled={!hasNext}
-                  className="rounded-full border border-zinc-700 p-2 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full border border-zinc-700 p-1.5 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 sm:p-2"
                   aria-label="Next beat"
                 >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="currentColor" aria-hidden="true">
                     <path d="M16 6h2v12h-2zM6 6l8 6-8 6z" />
                   </svg>
                 </button>
               </div>
 
-              <div className="ml-2 flex items-center gap-2 pr-1">
+              <div className="ml-2 hidden items-center gap-2 pr-1 sm:flex">
                 <button
                   type="button"
                   onClick={toggleMute}
@@ -451,6 +451,28 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
                 />
                 <span className="w-8 text-right text-[11px] text-zinc-500">{Math.round(volume * 100)}</span>
               </div>
+
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="ml-1 rounded-full border border-zinc-700 p-1.5 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100 sm:hidden"
+                aria-label={isMuted ? "Unmute audio" : "Mute audio"}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted || volume === 0 ? (
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                    <path d="m16 9 5 5" />
+                    <path d="m21 9-5 5" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                    <path d="M18 6a8.5 8.5 0 0 1 0 12" />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
         </div>
