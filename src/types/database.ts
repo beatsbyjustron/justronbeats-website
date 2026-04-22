@@ -67,6 +67,34 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["beat_offers"]["Insert"]>;
         Relationships: [];
       };
+      productions: {
+        Row: {
+          id: string;
+          created_at: string;
+          song_title: string;
+          artist_name: string;
+          cover_art_url: string;
+          spotify_url: string | null;
+          apple_music_url: string | null;
+          youtube_url: string | null;
+          soundcloud_url: string | null;
+          year: number | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          song_title: string;
+          artist_name: string;
+          cover_art_url: string;
+          spotify_url?: string | null;
+          apple_music_url?: string | null;
+          youtube_url?: string | null;
+          soundcloud_url?: string | null;
+          year?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["productions"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

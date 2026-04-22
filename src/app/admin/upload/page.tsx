@@ -21,6 +21,17 @@ type AdminBeat = {
   tags: string[];
   featured: boolean;
 };
+type AdminProduction = {
+  id: string;
+  song_title: string;
+  artist_name: string;
+  cover_art_url: string;
+  spotify_url: string | null;
+  apple_music_url: string | null;
+  youtube_url: string | null;
+  soundcloud_url: string | null;
+  year: number | null;
+};
 
 const initialStatus: Status = { type: "idle", message: "" };
 const initialUploadProgress: UploadProgress = {
@@ -36,6 +47,15 @@ const initialUploadForm = {
   bpm: "",
   tags: "",
   featured: false
+};
+const initialProductionForm = {
+  songTitle: "",
+  artistName: "",
+  spotifyUrl: "",
+  appleMusicUrl: "",
+  youtubeUrl: "",
+  soundcloudUrl: "",
+  year: ""
 };
 
 function getFileExtension(name: string) {
@@ -56,12 +76,20 @@ export default function AdminUploadPage() {
   const [wavFile, setWavFile] = useState<File | null>(null);
   const [stemsFile, setStemsFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [productionFileInputKey, setProductionFileInputKey] = useState(0);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>(initialUploadProgress);
   const [beats, setBeats] = useState<AdminBeat[]>([]);
+  const [productions, setProductions] = useState<AdminProduction[]>([]);
   const [isLoadingBeats, setIsLoadingBeats] = useState(false);
+  const [isLoadingProductions, setIsLoadingProductions] = useState(false);
   const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deletingBeatId, setDeletingBeatId] = useState<string | null>(null);
+  const [deletingProductionId, setDeletingProductionId] = useState<string | null>(null);
+  const [isSubmittingProduction, setIsSubmittingProduction] = useState(false);
+  const [productionStatus, setProductionStatus] = useState<Status>(initialStatus);
+  const [productionForm, setProductionForm] = useState(initialProductionForm);
+  const [productionCoverArtFile, setProductionCoverArtFile] = useState<File | null>(null);
   const [editForm, setEditForm] = useState({
     title: "",
     producerCredits: "",
@@ -117,6 +145,34 @@ export default function AdminUploadPage() {
     }
   };
 
+  const loadProductions = async () => {
+    setIsLoadingProductions(true);
+    setProductionStatus(initialStatus);
+    try {
+      const password = gatePassword || formPassword;
+      const response = await fetch("/api/admin/productions", {
+        method: "GET",
+        headers: {
+          "x-admin-password": password
+        }
+      });
+
+      const result = (await response.json()) as { error?: string; productions?: AdminProduction[] };
+      if (!response.ok) {
+        setProductionStatus({ type: "error", message: result.error ?? "Failed to fetch productions." });
+        setIsLoadingProductions(false);
+        return;
+      }
+
+      setProductions(result.productions ?? []);
+      setIsLoadingProductions(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to fetch productions.";
+      setProductionStatus({ type: "error", message });
+      setIsLoadingProductions(false);
+    }
+  };
+
   const unlock = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (gatePassword === expectedPassword) {
@@ -131,6 +187,7 @@ export default function AdminUploadPage() {
   useEffect(() => {
     if (!isUnlocked) return;
     void loadBeats();
+    void loadProductions();
   }, [isUnlocked]);
 
   const uploadToBeatsBucket = async (file: File, folder: string) => {
@@ -239,6 +296,99 @@ export default function AdminUploadPage() {
       alert(`Supabase upload rejected: ${message}`);
       setStatus({ type: "error", message });
       setIsSubmitting(false);
+    }
+  };
+
+  const submitProduction = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmittingProduction(true);
+    setProductionStatus(initialStatus);
+
+    if (!productionForm.songTitle.trim() || !productionForm.artistName.trim() || !productionCoverArtFile) {
+      setProductionStatus({ type: "error", message: "Song title, artist name, and cover art are required." });
+      setIsSubmittingProduction(false);
+      return;
+    }
+
+    if (!supabase) {
+      setProductionStatus({ type: "error", message: "Missing Supabase client configuration." });
+      setIsSubmittingProduction(false);
+      return;
+    }
+
+    try {
+      const folder = `productions/${productionForm.songTitle.trim().toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+      const coverArtUrl = await uploadToBeatsBucket(productionCoverArtFile, folder);
+
+      const response = await fetch("/api/admin/productions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          password: formPassword,
+          songTitle: productionForm.songTitle.trim(),
+          artistName: productionForm.artistName.trim(),
+          coverArtUrl,
+          spotifyUrl: productionForm.spotifyUrl.trim(),
+          appleMusicUrl: productionForm.appleMusicUrl.trim(),
+          youtubeUrl: productionForm.youtubeUrl.trim(),
+          soundcloudUrl: productionForm.soundcloudUrl.trim(),
+          year: productionForm.year ? Number(productionForm.year) : null
+        })
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setProductionStatus({ type: "error", message: result.error ?? "Failed to add production." });
+        setIsSubmittingProduction(false);
+        return;
+      }
+
+      setProductionForm(initialProductionForm);
+      setProductionCoverArtFile(null);
+      setProductionFileInputKey((prev) => prev + 1);
+      setProductionStatus({ type: "success", message: "Production added successfully." });
+      await loadProductions();
+      setIsSubmittingProduction(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to add production.";
+      alert(`Supabase upload rejected: ${message}`);
+      setProductionStatus({ type: "error", message });
+      setIsSubmittingProduction(false);
+    }
+  };
+
+  const deleteProduction = async (id: string) => {
+    const confirmed = window.confirm("Delete this production permanently?");
+    if (!confirmed) return;
+
+    setDeletingProductionId(id);
+    setProductionStatus(initialStatus);
+    try {
+      const response = await fetch("/api/admin/productions", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": gatePassword || formPassword
+        },
+        body: JSON.stringify({ id })
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setProductionStatus({ type: "error", message: result.error ?? "Failed to delete production." });
+        setDeletingProductionId(null);
+        return;
+      }
+
+      setProductionStatus({ type: "success", message: "Production deleted successfully." });
+      await loadProductions();
+      setDeletingProductionId(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete production.";
+      setProductionStatus({ type: "error", message });
+      setDeletingProductionId(null);
     }
   };
 
@@ -630,6 +780,127 @@ export default function AdminUploadPage() {
                     </div>
                   </div>
                 )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-zinc-100">Productions Management</h2>
+          <button
+            type="button"
+            onClick={() => void loadProductions()}
+            className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-200 transition hover:border-zinc-500"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <form onSubmit={submitProduction} className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              placeholder="Song title"
+              required
+              value={productionForm.songTitle}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, songTitle: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <input
+              placeholder="Artist name"
+              required
+              value={productionForm.artistName}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, artistName: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              placeholder="Spotify link (optional)"
+              value={productionForm.spotifyUrl}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, spotifyUrl: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <input
+              placeholder="Apple Music link (optional)"
+              value={productionForm.appleMusicUrl}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, appleMusicUrl: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <input
+              placeholder="YouTube link (optional)"
+              value={productionForm.youtubeUrl}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, youtubeUrl: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <input
+              placeholder="SoundCloud link (optional)"
+              value={productionForm.soundcloudUrl}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, soundcloudUrl: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              type="number"
+              min={1900}
+              max={2100}
+              placeholder="Year (optional)"
+              value={productionForm.year}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, year: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <label className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
+              Cover art image
+              <input
+                key={`production-cover-${productionFileInputKey}`}
+                type="file"
+                accept="image/*"
+                required
+                onChange={(event) => setProductionCoverArtFile(event.target.files?.[0] ?? null)}
+                className="mt-2 block w-full text-xs text-zinc-400"
+              />
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmittingProduction}
+            className="w-max rounded-full bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:opacity-60"
+          >
+            {isSubmittingProduction ? "Adding..." : "Add Production"}
+          </button>
+        </form>
+
+        {productionStatus.message && (
+          <p className={productionStatus.type === "error" ? "text-sm text-red-400" : "text-sm text-emerald-400"}>
+            {productionStatus.message}
+          </p>
+        )}
+
+        {isLoadingProductions ? (
+          <p className="text-sm text-zinc-400">Loading productions...</p>
+        ) : !productions.length ? (
+          <p className="text-sm text-zinc-400">No productions added yet.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {productions.map((production) => (
+              <article key={production.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-zinc-100">{production.song_title}</p>
+                    <p className="text-xs text-zinc-400">{production.artist_name}</p>
+                    {production.year && <p className="text-xs text-zinc-500">{production.year}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void deleteProduction(production.id)}
+                    disabled={deletingProductionId === production.id}
+                    className="rounded-full border border-red-500/60 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-950/60 disabled:opacity-60"
+                  >
+                    {deletingProductionId === production.id ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>
