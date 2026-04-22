@@ -19,17 +19,15 @@ function formatTime(seconds: number) {
 }
 
 export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug }: CustomAudioPlayerProps) {
-  const { currentBeat, isPlaying, currentTime, duration, playBeat, seekTo, togglePlayPause } = useGlobalAudioPlayer();
+  const { currentBeat, isPlaying, visualizerLevels, currentTime, duration, playBeat, seekTo, togglePlayPause } =
+    useGlobalAudioPlayer();
   const beatId = trackId || src;
   const isCurrentBeat = currentBeat?.id === beatId;
 
   const bars = useMemo(() => {
-    const active = isCurrentBeat && isPlaying;
-    return Array.from({ length: 16 }, (_, index) => {
-      if (!active) return 10 + (index % 3);
-      return 12 + ((index * 7) % 20);
-    });
-  }, [isCurrentBeat, isPlaying]);
+    if (!isCurrentBeat) return Array(16).fill(10);
+    return visualizerLevels.slice(0, 16).map((height) => Math.max(8, Math.round(height * 0.9)));
+  }, [isCurrentBeat, visualizerLevels]);
 
   const progress = isCurrentBeat ? currentTime : 0;
   const totalDuration = isCurrentBeat ? duration : 0;
@@ -68,8 +66,8 @@ export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug 
           {bars.map((height, index) => (
             <span
               key={`${index}-${height}`}
-              className={`w-1 rounded-full bg-zinc-100/90 transition-all duration-150 ${
-                isCurrentBeat && isPlaying ? "opacity-100" : "opacity-40"
+              className={`w-1 rounded-full transition-all duration-100 ${
+                isCurrentBeat && isPlaying ? "bg-emerald-400 opacity-100" : "bg-zinc-600 opacity-40"
               }`}
               style={{ height: `${height}px` }}
             />

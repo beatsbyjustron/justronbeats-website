@@ -10,6 +10,7 @@ type AudioPlayerContextValue = {
   queue: QueueBeat[];
   currentBeat: QueueBeat | null;
   isPlaying: boolean;
+  visualizerLevels: number[];
   currentTime: number;
   duration: number;
   setQueue: (beats: Beat[]) => void;
@@ -41,10 +42,17 @@ function mapQueueBeat(beat: Beat | QueueBeat): QueueBeat {
 
 export function GlobalAudioPlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+
   const [queue, setQueueState] = useState<QueueBeat[]>([]);
   const [currentBeat, setCurrentBeat] = useState<QueueBeat | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [visualizerLevels, setVisualizerLevels] = useState<number[]>(() => Array(24).fill(10));
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -52,6 +60,72 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
     const nextQueue = beats.map(mapQueueBeat);
     setQueueState(nextQueue);
   }, []);
+
+  const stopVisualizer = useCallback(() => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+  }, []);
+
+  const resetVisualizer = useCallback(() => {
+    setVisualizerLevels(Array(24).fill(10));
+  }, []);
+
+  const runVisualizerFrame = useCallback(() => {
+    const analyser = analyserRef.current;
+    const dataArray = dataArrayRef.current;
+    if (!analyser || !dataArray) return;
+
+    analyser.getByteFrequencyData(dataArray);
+
+    const nextBars = Array.from({ length: 24 }, (_, index) => {
+      const sample = dataArray[index % dataArray.length] ?? 0;
+      return Math.max(8, Math.round((sample / 255) * 34));
+    });
+
+    setVisualizerLevels(nextBars);
+    animationRef.current = requestAnimationFrame(runVisualizerFrame);
+  }, []);
+
+  const startVisualizer = useCallback(() => {
+    stopVisualizer();
+    animationRef.current = requestAnimationFrame(runVisualizerFrame);
+  }, [runVisualizerFrame, stopVisualizer]);
+
+  const ensureAnalyser = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return null;
+
+    if (!audioContextRef.current) {
+      const context = new window.AudioContext();
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.82;
+
+      const source = context.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(context.destination);
+
+      audioContextRef.current = context;
+      analyserRef.current = analyser;
+      sourceNodeRef.current = source;
+      dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+    }
+
+    return {
+      context: audioContextRef.current,
+      analyser: analyserRef.current
+    };
+  }, []);
+
+  const preparePlaybackGraph = useCallback(async () => {
+    const graph = ensureAnalyser();
+    if (!graph?.context) return;
+    if (graph.context.state === "suspended") {
+      await graph.context.resume();
+    }
+  }, [ensureAnalyser]);
 
   const playBeat = useCallback(async (beat: Beat | QueueBeat) => {
     const audio = audioRef.current;
@@ -67,9 +141,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
       setCurrentTime(0);
     }
 
+    await preparePlaybackGraph();
     await audio.play();
+    startVisualizer();
     setIsPlaying(true);
-  }, [currentBeat]);
+  }, [currentBeat, preparePlaybackGraph, startVisualizer]);
 
   const togglePlayPause = useCallback(async () => {
     const audio = audioRef.current;
@@ -77,13 +153,17 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
 
     if (isPlaying) {
       audio.pause();
+      stopVisualizer();
+      resetVisualizer();
       setIsPlaying(false);
       return;
     }
 
+    await preparePlaybackGraph();
     await audio.play();
+    startVisualizer();
     setIsPlaying(true);
-  }, [currentBeat, isPlaying]);
+  }, [currentBeat, isPlaying, preparePlaybackGraph, resetVisualizer, startVisualizer, stopVisualizer]);
 
   const playByIndex = useCallback(async (index: number) => {
     if (index < 0 || index >= queue.length) return;
@@ -156,11 +236,21 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [currentBeat, hasNext, hasPrevious, playNext, playPrevious, togglePlayPause]);
 
+  useEffect(() => {
+    return () => {
+      stopVisualizer();
+      if (audioContextRef.current) {
+        void audioContextRef.current.close();
+      }
+    };
+  }, [stopVisualizer]);
+
   const value = useMemo<AudioPlayerContextValue>(
     () => ({
       queue,
       currentBeat,
       isPlaying,
+      visualizerLevels,
       currentTime,
       duration,
       setQueue,
@@ -170,7 +260,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
       playPrevious,
       seekTo
     }),
-    [queue, currentBeat, isPlaying, currentTime, duration, setQueue, playBeat, togglePlayPause, playNext, playPrevious, seekTo]
+    [queue, currentBeat, isPlaying, visualizerLevels, currentTime, duration, setQueue, playBeat, togglePlayPause, playNext, playPrevious, seekTo]
   );
 
   return (
@@ -181,9 +271,18 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
         preload="metadata"
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
-        onPause={() => setIsPlaying(false)}
-        onPlay={() => setIsPlaying(true)}
+        onPause={() => {
+          setIsPlaying(false);
+          stopVisualizer();
+          resetVisualizer();
+        }}
+        onPlay={() => {
+          setIsPlaying(true);
+          startVisualizer();
+        }}
         onEnded={() => {
+          stopVisualizer();
+          resetVisualizer();
           if (hasNext) {
             void playNext();
             return;
@@ -208,7 +307,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
             />
           </div>
 
-          <div className="mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3">
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-[minmax(0,1fr)_minmax(160px,260px)_auto_1fr] items-center gap-3 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <img
                 src={currentBeat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
@@ -221,6 +320,18 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </p>
               </div>
+            </div>
+
+            <div className="flex h-8 items-end justify-center gap-1">
+              {visualizerLevels.slice(0, 18).map((height, index) => (
+                <span
+                  key={`bottom-bar-${index}-${height}`}
+                  className={`w-1 rounded-full transition-all duration-100 ${
+                    isPlaying ? "bg-emerald-400" : "bg-zinc-700"
+                  }`}
+                  style={{ height: `${Math.max(6, Math.round(height * 0.75))}px` }}
+                />
+              ))}
             </div>
 
             <div className="flex items-center justify-center gap-2">
