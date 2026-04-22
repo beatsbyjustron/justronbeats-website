@@ -12,18 +12,37 @@ export default function ContactPage() {
   const [form, setForm] = useState(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setConfirmation("");
+    setErrorMessage("");
 
-    // Simulate an async submit flow so UX matches real send behavior.
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(form)
+      });
 
-    setForm(initialForm);
-    setConfirmation("Your message has been sent! Justron will get back to you shortly.");
-    setIsSubmitting(false);
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setErrorMessage(result.error ?? "Unable to send your message right now.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      setForm(initialForm);
+      setConfirmation("Your message has been sent! Justron will get back to you shortly.");
+      setIsSubmitting(false);
+    } catch {
+      setErrorMessage("Unable to send your message right now. Please try again shortly.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -85,6 +104,10 @@ export default function ContactPage() {
         >
           {isSubmitting ? "Sending..." : "Send message"}
         </button>
+
+        {!!errorMessage && (
+          <p className="rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm text-red-300">{errorMessage}</p>
+        )}
 
         {!!confirmation && (
           <p className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-300">
