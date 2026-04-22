@@ -58,6 +58,11 @@ export async function POST(request: Request) {
       .filter(Boolean);
     const featured = String(formData.get("featured") ?? "false") === "true";
 
+    const providedCoverArtUrl = String(formData.get("coverArtUrl") ?? "").trim();
+    const providedMp3Url = String(formData.get("mp3Url") ?? "").trim();
+    const providedWavUrl = String(formData.get("wavUrl") ?? "").trim();
+    const providedStemsUrl = String(formData.get("stemsUrl") ?? "").trim();
+
     const coverArt = formData.get("coverArt") as File;
     const mp3File = formData.get("mp3File") as File;
     const wavFile = formData.get("wavFile") as File | null;
@@ -68,19 +73,25 @@ export async function POST(request: Request) {
     const hasWav = wavFile instanceof File && wavFile.size > 0;
     const hasStems = stemsFile instanceof File && stemsFile.size > 0;
 
-    if (!title || !hasMp3 || !hasCoverArt) {
+    const hasProvidedCoverArt = Boolean(providedCoverArtUrl);
+    const hasProvidedMp3 = Boolean(providedMp3Url);
+
+    if (!title || (!hasMp3 && !hasProvidedMp3) || (!hasCoverArt && !hasProvidedCoverArt)) {
       return NextResponse.json({ error: "Title, cover art, and MP3 are required." }, { status: 400 });
     }
 
     const folder = `${title.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
-    const [coverArtUrl, mp3Url] = await Promise.all([uploadFile(supabase, coverArt, folder), uploadFile(supabase, mp3File, folder)]);
 
-    let wavUrl: string | null = null;
+    const coverArtUrl =
+      hasCoverArt && coverArt instanceof File ? await uploadFile(supabase, coverArt, folder) : providedCoverArtUrl;
+    const mp3Url = hasMp3 && mp3File instanceof File ? await uploadFile(supabase, mp3File, folder) : providedMp3Url;
+
+    let wavUrl: string | null = providedWavUrl || null;
     if (hasWav && wavFile instanceof File) {
       wavUrl = await uploadFile(supabase, wavFile, folder);
     }
 
-    let stemsUrl: string | null = null;
+    let stemsUrl: string | null = providedStemsUrl || null;
     if (hasStems && stemsFile instanceof File) {
       stemsUrl = await uploadFile(supabase, stemsFile, folder);
     }
