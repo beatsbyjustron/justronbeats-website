@@ -20,3 +20,11 @@ body {
 .artist-ticker-track {
   animation: ticker-scroll 24s linear infinite;
 }
+
+.delay-2000 {
+  animation-delay: 2s;
+}
+
+.delay-4000 {
+  animation-delay: 4s;
+}
