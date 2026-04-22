@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BeatDetailContent } from "@/components/beat-detail-content";
-import { fetchBeatById } from "@/lib/beats";
+import { fetchBeatBySlug } from "@/lib/beats";
 
 type BeatPageProps = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function BeatPage({ params }: BeatPageProps) {
-  const { id } = await params;
-  const beat = await fetchBeatById(id);
+  const { slug } = await params;
+  const beat = await fetchBeatBySlug(slug);
 
   if (!beat) {
     notFound();

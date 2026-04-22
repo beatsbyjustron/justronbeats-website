@@ -16,6 +16,15 @@ type BeatRow = {
   featured: boolean | null;
 };
 
+export function slugifyBeatTitle(title: string) {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
 function normalizeStorageUrl(url: string | null) {
   if (!url) return "";
   const trimmed = url.trim();
@@ -49,6 +58,7 @@ function parseProducedBy(value: string | null): string[] {
 function mapBeat(row: BeatRow): Beat {
   return {
     id: row.id,
+    slug: slugifyBeatTitle(row.title),
     title: row.title,
     producedBy: Array.isArray(row.produced_by) ? row.produced_by : parseProducedBy(row.producer_credits),
     bpm: row.bpm,
@@ -72,14 +82,9 @@ export async function fetchBeats(): Promise<Beat[]> {
   return (data as BeatRow[]).map(mapBeat);
 }
 
-export async function fetchBeatById(id: string): Promise<Beat | null> {
-  const supabase = getSupabaseServerClient();
-  if (!supabase) return null;
-
-  const { data, error } = await supabase.from("beats").select("*").eq("id", id).single();
-  if (error || !data) return null;
-
-  return mapBeat(data as BeatRow);
+export async function fetchBeatBySlug(slug: string): Promise<Beat | null> {
+  const beats = await fetchBeats();
+  return beats.find((beat) => beat.slug === slug) ?? null;
 }
 
 export function mapFeaturedProductions(beats: Beat[]): FeaturedProduction[] {

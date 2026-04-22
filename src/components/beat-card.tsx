@@ -98,7 +98,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
 
   const copyBeatLink = async () => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const shareUrl = `${baseUrl}/beats/${encodeURIComponent(beat.id)}`;
+    const shareUrl = `${baseUrl}/beats/${encodeURIComponent(beat.slug)}`;
     await navigator.clipboard.writeText(shareUrl);
     setShowCopied(true);
     setTimeout(() => setShowCopied(false), 1200);
@@ -110,7 +110,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
     if (typeof window !== "undefined") {
       sessionStorage.setItem("justronbeats:returnBeatId", beat.id);
     }
-    router.push(`/beats/${beat.id}`);
+    router.push(`/beats/${beat.slug}`);
   };
 
   return (

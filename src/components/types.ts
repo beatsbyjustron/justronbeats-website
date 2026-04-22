@@ -1,5 +1,6 @@
 export type Beat = {
   id: string;
+  slug: string;
   title: string;
   bpm: number;
   key: string;
