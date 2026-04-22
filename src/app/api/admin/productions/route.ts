@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("productions")
-    .select("id, song_title, artist_name, cover_art_url, spotify_url, apple_music_url, youtube_url, soundcloud_url, year, created_at")
+    .select("id, title, artist, cover_url, spotify_url, apple_url, youtube_url, soundcloud_url, year, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -46,11 +46,11 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       password?: string;
-      songTitle?: string;
-      artistName?: string;
-      coverArtUrl?: string;
+      title?: string;
+      artist?: string;
+      coverUrl?: string;
       spotifyUrl?: string;
-      appleMusicUrl?: string;
+      appleUrl?: string;
       youtubeUrl?: string;
       soundcloudUrl?: string;
       year?: number | null;
@@ -65,11 +65,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
     }
 
-    const songTitle = String(body.songTitle ?? "").trim();
-    const artistName = String(body.artistName ?? "").trim();
-    const coverArtUrl = String(body.coverArtUrl ?? "").trim();
+    const title = String(body.title ?? "").trim();
+    const artist = String(body.artist ?? "").trim();
+    const coverUrl = String(body.coverUrl ?? "").trim();
 
-    if (!songTitle || !artistName || !coverArtUrl) {
+    if (!title || !artist || !coverUrl) {
       return NextResponse.json({ error: "Song title, artist name, and cover art are required." }, { status: 400 });
     }
 
@@ -77,11 +77,11 @@ export async function POST(request: Request) {
     const year = Number.isFinite(maybeYear) && maybeYear > 0 ? Math.floor(maybeYear) : null;
 
     const { error } = await supabase.from("productions").insert({
-      song_title: songTitle,
-      artist_name: artistName,
-      cover_art_url: coverArtUrl,
+      title,
+      artist,
+      cover_url: coverUrl,
       spotify_url: String(body.spotifyUrl ?? "").trim() || null,
-      apple_music_url: String(body.appleMusicUrl ?? "").trim() || null,
+      apple_url: String(body.appleUrl ?? "").trim() || null,
       youtube_url: String(body.youtubeUrl ?? "").trim() || null,
       soundcloud_url: String(body.soundcloudUrl ?? "").trim() || null,
       year
@@ -95,6 +95,66 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create production.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  if (!hasValidAdminPassword(request)) {
+    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase environment variables are missing" }, { status: 500 });
+  }
+
+  try {
+    const body = (await request.json()) as {
+      id?: string;
+      title?: string;
+      artist?: string;
+      spotifyUrl?: string;
+      appleUrl?: string;
+      youtubeUrl?: string;
+      soundcloudUrl?: string;
+      year?: number | null;
+    };
+
+    const id = String(body.id ?? "").trim();
+    const title = String(body.title ?? "").trim();
+    const artist = String(body.artist ?? "").trim();
+    if (!id) {
+      return NextResponse.json({ error: "Production id is required." }, { status: 400 });
+    }
+    if (!title || !artist) {
+      return NextResponse.json({ error: "Song title and artist name are required." }, { status: 400 });
+    }
+
+    const maybeYear = Number(body.year);
+    const year = Number.isFinite(maybeYear) && maybeYear > 0 ? Math.floor(maybeYear) : null;
+
+    const { error } = await supabase
+      .from("productions")
+      .update({
+        title,
+        artist,
+        spotify_url: String(body.spotifyUrl ?? "").trim() || null,
+        apple_url: String(body.appleUrl ?? "").trim() || null,
+        youtube_url: String(body.youtubeUrl ?? "").trim() || null,
+        soundcloud_url: String(body.soundcloudUrl ?? "").trim() || null,
+        year
+      })
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    revalidatePath("/productions");
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update production.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

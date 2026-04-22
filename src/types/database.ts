@@ -71,11 +71,11 @@ export interface Database {
         Row: {
           id: string;
           created_at: string;
-          song_title: string;
-          artist_name: string;
-          cover_art_url: string;
+          title: string;
+          artist: string;
+          cover_url: string;
           spotify_url: string | null;
-          apple_music_url: string | null;
+          apple_url: string | null;
           youtube_url: string | null;
           soundcloud_url: string | null;
           year: number | null;
@@ -83,11 +83,11 @@ export interface Database {
         Insert: {
           id?: string;
           created_at?: string;
-          song_title: string;
-          artist_name: string;
-          cover_art_url: string;
+          title: string;
+          artist: string;
+          cover_url: string;
           spotify_url?: string | null;
-          apple_music_url?: string | null;
+          apple_url?: string | null;
           youtube_url?: string | null;
           soundcloud_url?: string | null;
           year?: number | null;

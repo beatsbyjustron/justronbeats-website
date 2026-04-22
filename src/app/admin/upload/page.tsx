@@ -23,11 +23,11 @@ type AdminBeat = {
 };
 type AdminProduction = {
   id: string;
-  song_title: string;
-  artist_name: string;
-  cover_art_url: string;
+  title: string;
+  artist: string;
+  cover_url: string;
   spotify_url: string | null;
-  apple_music_url: string | null;
+  apple_url: string | null;
   youtube_url: string | null;
   soundcloud_url: string | null;
   year: number | null;
@@ -49,10 +49,10 @@ const initialUploadForm = {
   featured: false
 };
 const initialProductionForm = {
-  songTitle: "",
-  artistName: "",
+  title: "",
+  artist: "",
   spotifyUrl: "",
-  appleMusicUrl: "",
+  appleUrl: "",
   youtubeUrl: "",
   soundcloudUrl: "",
   year: ""
@@ -65,6 +65,7 @@ function getFileExtension(name: string) {
 
 export default function AdminUploadPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"beats" | "productions">("beats");
   const [gatePassword, setGatePassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,9 +87,12 @@ export default function AdminUploadPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deletingBeatId, setDeletingBeatId] = useState<string | null>(null);
   const [deletingProductionId, setDeletingProductionId] = useState<string | null>(null);
+  const [editingProductionId, setEditingProductionId] = useState<string | null>(null);
+  const [isSavingProductionEdit, setIsSavingProductionEdit] = useState(false);
   const [isSubmittingProduction, setIsSubmittingProduction] = useState(false);
   const [productionStatus, setProductionStatus] = useState<Status>(initialStatus);
   const [productionForm, setProductionForm] = useState(initialProductionForm);
+  const [productionEditForm, setProductionEditForm] = useState(initialProductionForm);
   const [productionCoverArtFile, setProductionCoverArtFile] = useState<File | null>(null);
   const [editForm, setEditForm] = useState({
     title: "",
@@ -304,7 +308,7 @@ export default function AdminUploadPage() {
     setIsSubmittingProduction(true);
     setProductionStatus(initialStatus);
 
-    if (!productionForm.songTitle.trim() || !productionForm.artistName.trim() || !productionCoverArtFile) {
+    if (!productionForm.title.trim() || !productionForm.artist.trim() || !productionCoverArtFile) {
       setProductionStatus({ type: "error", message: "Song title, artist name, and cover art are required." });
       setIsSubmittingProduction(false);
       return;
@@ -317,7 +321,7 @@ export default function AdminUploadPage() {
     }
 
     try {
-      const folder = `productions/${productionForm.songTitle.trim().toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+      const folder = `productions/${productionForm.title.trim().toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
       const coverArtUrl = await uploadToBeatsBucket(productionCoverArtFile, folder);
 
       const response = await fetch("/api/admin/productions", {
@@ -327,11 +331,11 @@ export default function AdminUploadPage() {
         },
         body: JSON.stringify({
           password: formPassword,
-          songTitle: productionForm.songTitle.trim(),
-          artistName: productionForm.artistName.trim(),
-          coverArtUrl,
+          title: productionForm.title.trim(),
+          artist: productionForm.artist.trim(),
+          coverUrl: coverArtUrl,
           spotifyUrl: productionForm.spotifyUrl.trim(),
-          appleMusicUrl: productionForm.appleMusicUrl.trim(),
+          appleUrl: productionForm.appleUrl.trim(),
           youtubeUrl: productionForm.youtubeUrl.trim(),
           soundcloudUrl: productionForm.soundcloudUrl.trim(),
           year: productionForm.year ? Number(productionForm.year) : null
@@ -356,6 +360,63 @@ export default function AdminUploadPage() {
       alert(`Supabase upload rejected: ${message}`);
       setProductionStatus({ type: "error", message });
       setIsSubmittingProduction(false);
+    }
+  };
+
+  const beginProductionEdit = (production: AdminProduction) => {
+    setEditingProductionId(production.id);
+    setProductionStatus(initialStatus);
+    setProductionEditForm({
+      title: production.title,
+      artist: production.artist,
+      spotifyUrl: production.spotify_url ?? "",
+      appleUrl: production.apple_url ?? "",
+      youtubeUrl: production.youtube_url ?? "",
+      soundcloudUrl: production.soundcloud_url ?? "",
+      year: production.year ? String(production.year) : ""
+    });
+  };
+
+  const saveProductionEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingProductionId) return;
+
+    setIsSavingProductionEdit(true);
+    setProductionStatus(initialStatus);
+    try {
+      const response = await fetch("/api/admin/productions", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": gatePassword || formPassword
+        },
+        body: JSON.stringify({
+          id: editingProductionId,
+          title: productionEditForm.title.trim(),
+          artist: productionEditForm.artist.trim(),
+          spotifyUrl: productionEditForm.spotifyUrl.trim(),
+          appleUrl: productionEditForm.appleUrl.trim(),
+          youtubeUrl: productionEditForm.youtubeUrl.trim(),
+          soundcloudUrl: productionEditForm.soundcloudUrl.trim(),
+          year: productionEditForm.year ? Number(productionEditForm.year) : null
+        })
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setProductionStatus({ type: "error", message: result.error ?? "Failed to update production." });
+        setIsSavingProductionEdit(false);
+        return;
+      }
+
+      setProductionStatus({ type: "success", message: "Production updated successfully." });
+      setEditingProductionId(null);
+      await loadProductions();
+      setIsSavingProductionEdit(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update production.";
+      setProductionStatus({ type: "error", message });
+      setIsSavingProductionEdit(false);
     }
   };
 
@@ -512,7 +573,34 @@ export default function AdminUploadPage() {
 
   return (
     <main className="space-y-8">
-      <h1 className="text-3xl font-semibold text-zinc-100">Upload Beat</h1>
+      <h1 className="text-3xl font-semibold text-zinc-100">Admin Dashboard</h1>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("beats")}
+          className={`rounded-full px-4 py-2 text-sm transition ${
+            activeTab === "beats"
+              ? "bg-zinc-100 font-semibold text-zinc-900"
+              : "border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          Beats
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("productions")}
+          className={`rounded-full px-4 py-2 text-sm transition ${
+            activeTab === "productions"
+              ? "bg-zinc-100 font-semibold text-zinc-900"
+              : "border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          Productions
+        </button>
+      </div>
+
+      {activeTab === "beats" && (
+        <>
       <form onSubmit={submitBeat} className="grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <input
           name="title"
@@ -785,7 +873,10 @@ export default function AdminUploadPage() {
           </div>
         )}
       </section>
+        </>
+      )}
 
+      {activeTab === "productions" && (
       <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-zinc-100">Productions Management</h2>
@@ -803,15 +894,15 @@ export default function AdminUploadPage() {
             <input
               placeholder="Song title"
               required
-              value={productionForm.songTitle}
-              onChange={(event) => setProductionForm((prev) => ({ ...prev, songTitle: event.target.value }))}
+              value={productionForm.title}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, title: event.target.value }))}
               className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
             />
             <input
               placeholder="Artist name"
               required
-              value={productionForm.artistName}
-              onChange={(event) => setProductionForm((prev) => ({ ...prev, artistName: event.target.value }))}
+              value={productionForm.artist}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, artist: event.target.value }))}
               className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
             />
           </div>
@@ -824,8 +915,8 @@ export default function AdminUploadPage() {
             />
             <input
               placeholder="Apple Music link (optional)"
-              value={productionForm.appleMusicUrl}
-              onChange={(event) => setProductionForm((prev) => ({ ...prev, appleMusicUrl: event.target.value }))}
+              value={productionForm.appleUrl}
+              onChange={(event) => setProductionForm((prev) => ({ ...prev, appleUrl: event.target.value }))}
               className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
             />
             <input
@@ -886,26 +977,104 @@ export default function AdminUploadPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             {productions.map((production) => (
               <article key={production.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-zinc-100">{production.song_title}</p>
-                    <p className="text-xs text-zinc-400">{production.artist_name}</p>
-                    {production.year && <p className="text-xs text-zinc-500">{production.year}</p>}
+                {editingProductionId === production.id ? (
+                  <form onSubmit={saveProductionEdit} className="grid gap-3">
+                    <input
+                      value={productionEditForm.title}
+                      onChange={(event) => setProductionEditForm((prev) => ({ ...prev, title: event.target.value }))}
+                      placeholder="Song title"
+                      required
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                    />
+                    <input
+                      value={productionEditForm.artist}
+                      onChange={(event) => setProductionEditForm((prev) => ({ ...prev, artist: event.target.value }))}
+                      placeholder="Artist name"
+                      required
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input
+                        value={productionEditForm.spotifyUrl}
+                        onChange={(event) => setProductionEditForm((prev) => ({ ...prev, spotifyUrl: event.target.value }))}
+                        placeholder="Spotify link"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                      <input
+                        value={productionEditForm.appleUrl}
+                        onChange={(event) => setProductionEditForm((prev) => ({ ...prev, appleUrl: event.target.value }))}
+                        placeholder="Apple Music link"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                      <input
+                        value={productionEditForm.youtubeUrl}
+                        onChange={(event) => setProductionEditForm((prev) => ({ ...prev, youtubeUrl: event.target.value }))}
+                        placeholder="YouTube link"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                      <input
+                        value={productionEditForm.soundcloudUrl}
+                        onChange={(event) => setProductionEditForm((prev) => ({ ...prev, soundcloudUrl: event.target.value }))}
+                        placeholder="SoundCloud link"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                    </div>
+                    <input
+                      type="number"
+                      value={productionEditForm.year}
+                      onChange={(event) => setProductionEditForm((prev) => ({ ...prev, year: event.target.value }))}
+                      placeholder="Year"
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={isSavingProductionEdit}
+                        className="rounded-full bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:opacity-60"
+                      >
+                        {isSavingProductionEdit ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingProductionId(null)}
+                        className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition hover:border-zinc-500"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-zinc-100">{production.title}</p>
+                      <p className="text-xs text-zinc-400">{production.artist}</p>
+                      {production.year && <p className="text-xs text-zinc-500">{production.year}</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => beginProductionEdit(production)}
+                        className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteProduction(production.id)}
+                        disabled={deletingProductionId === production.id}
+                        className="rounded-full border border-red-500/60 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-950/60 disabled:opacity-60"
+                      >
+                        {deletingProductionId === production.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void deleteProduction(production.id)}
-                    disabled={deletingProductionId === production.id}
-                    className="rounded-full border border-red-500/60 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-950/60 disabled:opacity-60"
-                  >
-                    {deletingProductionId === production.id ? "Deleting..." : "Delete"}
-                  </button>
-                </div>
+                )}
               </article>
             ))}
           </div>
         )}
       </section>
+      )}
     </main>
   );
 }

@@ -30,12 +30,17 @@ create table if not exists public.beat_offers (
 create table if not exists public.productions (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
-  song_title text not null,
-  artist_name text not null,
-  cover_art_url text not null,
+  title text not null,
+  artist text not null,
+  cover_url text not null,
   spotify_url text,
-  apple_music_url text,
+  apple_url text,
   youtube_url text,
   soundcloud_url text,
   year int
 );
+
+alter table if exists public.productions rename column song_title to title;
+alter table if exists public.productions rename column artist_name to artist;
+alter table if exists public.productions rename column cover_art_url to cover_url;
+alter table if exists public.productions rename column apple_music_url to apple_url;
