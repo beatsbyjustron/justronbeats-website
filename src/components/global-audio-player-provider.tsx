@@ -77,6 +77,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
   const runVisualizerFrame = useCallback(() => {
     const analyser = analyserRef.current;
     const dataArray = dataArrayRef.current;
+    const audio = audioRef.current;
+    if (audio) {
+      setCurrentTime(audio.currentTime);
+    }
     if (!analyser || !dataArray) return;
 
     analyser.getByteFrequencyData(dataArray);
@@ -302,7 +306,13 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
         ref={audioRef}
         crossOrigin="anonymous"
         preload="metadata"
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onTimeUpdate={() => {
+          // Smooth updates are driven by requestAnimationFrame while playing.
+          // Keep this as a fallback for paused/seeking edge cases.
+          if (!isPlaying && audioRef.current) {
+            setCurrentTime(audioRef.current.currentTime);
+          }
+        }}
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
         onPause={() => {
           setIsPlaying(false);
