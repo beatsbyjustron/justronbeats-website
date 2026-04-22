@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BeatCard } from "@/components/beat-card";
 import { Beat } from "@/components/types";
 
@@ -19,6 +19,34 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
   );
 
   const hasMore = beats.length > initiallyVisible;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const returnBeatId = sessionStorage.getItem("justronbeats:returnBeatId");
+    if (!returnBeatId) return;
+
+    const beatIndex = beats.findIndex((beat) => beat.id === returnBeatId);
+    if (beatIndex === -1) {
+      sessionStorage.removeItem("justronbeats:returnBeatId");
+      return;
+    }
+
+    if (beatIndex >= initiallyVisible) {
+      setExpanded(true);
+    }
+
+    // Wait for render (and optional expansion) before scrolling.
+    const timeout = window.setTimeout(() => {
+      const target = document.querySelector<HTMLElement>(`[data-beat-id="${returnBeatId}"]`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      sessionStorage.removeItem("justronbeats:returnBeatId");
+    }, 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [beats, initiallyVisible]);
 
   const getSuggestions = (currentBeat: Beat) => {
     return beats

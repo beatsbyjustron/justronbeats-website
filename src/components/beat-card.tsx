@@ -107,11 +107,15 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
   const onCardClick = (event: MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("button, a, input, textarea, select, label, form")) return;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("justronbeats:returnBeatId", beat.id);
+    }
     router.push(`/beats/${beat.id}`);
   };
 
   return (
     <article
+      data-beat-id={beat.id}
       className="relative cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 transition hover:border-zinc-700"
       onClick={onCardClick}
     >
