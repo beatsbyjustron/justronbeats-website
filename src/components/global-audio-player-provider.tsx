@@ -47,11 +47,13 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationRef = useRef<number | null>(null);
   const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const lastNonZeroVolumeRef = useRef(1);
 
   const [queue, setQueueState] = useState<QueueBeat[]>([]);
   const [currentBeat, setCurrentBeat] = useState<QueueBeat | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
   const [visualizerLevels, setVisualizerLevels] = useState<number[]>(() => Array(24).fill(10));
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -194,9 +196,40 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
   const toggleMute = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const nextMuted = !audio.muted;
-    audio.muted = nextMuted;
-    setIsMuted(nextMuted);
+
+    if (audio.muted || volume === 0) {
+      const restoredVolume = Math.max(0.1, lastNonZeroVolumeRef.current || 1);
+      audio.muted = false;
+      audio.volume = restoredVolume;
+      setIsMuted(false);
+      setVolume(restoredVolume);
+      return;
+    }
+
+    if (audio.volume > 0) {
+      lastNonZeroVolumeRef.current = audio.volume;
+    }
+    audio.muted = true;
+    setIsMuted(true);
+  }, [volume]);
+
+  const onVolumeChange = useCallback((nextValue: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const normalized = Math.min(1, Math.max(0, nextValue));
+    audio.volume = normalized;
+    setVolume(normalized);
+
+    if (normalized <= 0) {
+      audio.muted = true;
+      setIsMuted(true);
+      return;
+    }
+
+    lastNonZeroVolumeRef.current = normalized;
+    audio.muted = false;
+    setIsMuted(false);
   }, []);
 
   const currentIndex = currentBeat ? queue.findIndex((beat) => beat.id === currentBeat.id) : -1;
@@ -307,96 +340,107 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
             />
           </div>
 
-          <div className="mx-auto grid w-full max-w-6xl grid-cols-[minmax(0,1fr)_minmax(160px,260px)_auto_1fr] items-center gap-3 px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-3 overflow-x-auto">
               <img
                 src={currentBeat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
                 alt={currentBeat.title}
                 className="h-11 w-11 rounded-md object-cover"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 max-w-[220px]">
                 <p className="truncate text-sm font-medium text-zinc-100">{currentBeat.title}</p>
                 <p className="text-[11px] text-zinc-500">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </p>
               </div>
-            </div>
 
-            <div className="flex h-8 items-end justify-center gap-1">
-              {visualizerLevels.slice(0, 18).map((height, index) => (
-                <span
-                  key={`bottom-bar-${index}-${height}`}
-                  className={`w-1 rounded-full transition-all duration-100 ${
-                    isPlaying ? "bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300" : "bg-zinc-700"
-                  }`}
-                  style={{ height: `${Math.max(6, Math.round(height * 0.75))}px` }}
+              <div className="ml-1 flex h-8 items-end gap-1">
+                {visualizerLevels.slice(0, 18).map((height, index) => (
+                  <span
+                    key={`bottom-bar-${index}-${height}`}
+                    className={`w-1 shrink-0 rounded-full transition-all duration-100 ${
+                      isPlaying ? "bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300" : "bg-zinc-700"
+                    }`}
+                    style={{ height: `${Math.max(6, Math.round(height * 0.75))}px` }}
+                  />
+                ))}
+              </div>
+
+              <div className="ml-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void playPrevious()}
+                  disabled={!hasPrevious}
+                  className="rounded-full border border-zinc-700 p-2 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Previous beat"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                    <path d="M6 6h2v12H6zM18 6v12l-8-6z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void togglePlayPause()}
+                  className="rounded-full bg-zinc-100 p-2 text-zinc-900 transition hover:bg-zinc-200"
+                  aria-label={isPlaying ? "Pause playback" : "Play playback"}
+                >
+                  {isPlaying ? (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                      <path d="M7 6h4v12H7zM13 6h4v12h-4z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void playNext()}
+                  disabled={!hasNext}
+                  className="rounded-full border border-zinc-700 p-2 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Next beat"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                    <path d="M16 6h2v12h-2zM6 6l8 6-8 6z" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="ml-2 flex items-center gap-2 pr-1">
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  className="rounded-full border border-zinc-700 p-2 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                  aria-label={isMuted ? "Unmute audio" : "Mute audio"}
+                  title={isMuted ? "Unmute" : "Mute"}
+                >
+                  {isMuted || volume === 0 ? (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                      <path d="m16 9 5 5" />
+                      <path d="m21 9-5 5" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                      <path d="M18 6a8.5 8.5 0 0 1 0 12" />
+                    </svg>
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={volume}
+                  onChange={(event) => onVolumeChange(Number(event.target.value))}
+                  aria-label="Volume"
+                  className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-zinc-800 accent-zinc-200 sm:w-28"
                 />
-              ))}
-            </div>
-
-            <div className="flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => void playPrevious()}
-                disabled={!hasPrevious}
-                className="rounded-full border border-zinc-700 p-2 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Previous beat"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-                  <path d="M6 6h2v12H6zM18 6v12l-8-6z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => void togglePlayPause()}
-                className="rounded-full bg-zinc-100 p-2 text-zinc-900 transition hover:bg-zinc-200"
-                aria-label={isPlaying ? "Pause playback" : "Play playback"}
-              >
-                {isPlaying ? (
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-                    <path d="M7 6h4v12H7zM13 6h4v12h-4z" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => void playNext()}
-                disabled={!hasNext}
-                className="rounded-full border border-zinc-700 p-2 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Next beat"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-                  <path d="M16 6h2v12h-2zM6 6l8 6-8 6z" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={toggleMute}
-                className="rounded-full border border-zinc-700 p-2 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
-                aria-label={isMuted ? "Unmute audio" : "Mute audio"}
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted ? (
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
-                    <path d="m16 9 5 5" />
-                    <path d="m21 9-5 5" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
-                    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-                    <path d="M18 6a8.5 8.5 0 0 1 0 12" />
-                  </svg>
-                )}
-              </button>
+                <span className="w-8 text-right text-[11px] text-zinc-500">{Math.round(volume * 100)}</span>
+              </div>
             </div>
           </div>
         </div>
