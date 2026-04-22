@@ -107,7 +107,7 @@ export function BeatDetailContent({ beat }: BeatDetailContentProps) {
         </div>
       </div>
 
-      <CustomAudioPlayer src={beat.mp3Url} debugLabel={beat.title} />
+      <CustomAudioPlayer src={beat.mp3Url} debugLabel={beat.title} trackId={beat.id} />
 
       <div className="flex flex-wrap items-center gap-3">
         <button

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { activateAudioPlayer, registerAudioPlayer, unregisterAudioPlayer } from "@/lib/audio-playback-manager";
 
 type CustomAudioPlayerProps = {
   src: string;
   debugLabel?: string;
+  trackId?: string;
 };
 
 function formatTime(seconds: number) {
@@ -14,12 +16,13 @@ function formatTime(seconds: number) {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-export function CustomAudioPlayer({ src, debugLabel }: CustomAudioPlayerProps) {
+export function CustomAudioPlayer({ src, debugLabel, trackId }: CustomAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const frameRef = useRef<number | null>(null);
+  const playerIdRef = useRef(trackId || `${debugLabel || "beat"}-${Math.random().toString(36).slice(2)}`);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -38,11 +41,21 @@ export function CustomAudioPlayer({ src, debugLabel }: CustomAudioPlayerProps) {
   }, [debugLabel, src]);
 
   useEffect(() => {
+    const stopPlayback = () => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.pause();
+      setIsPlaying(false);
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    };
+
+    registerAudioPlayer(playerIdRef.current, stopPlayback);
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
       if (contextRef.current) {
         contextRef.current.close();
       }
+      unregisterAudioPlayer(playerIdRef.current);
     };
   }, []);
 
@@ -103,6 +116,7 @@ export function CustomAudioPlayer({ src, debugLabel }: CustomAudioPlayerProps) {
     if (!analyser) return;
 
     try {
+      activateAudioPlayer(playerIdRef.current);
       console.log("[CustomAudioPlayer] about to call audio.play()", {
         label: debugLabel ?? "unknown beat",
         src,

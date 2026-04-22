@@ -160,7 +160,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
         </div>
       </div>
 
-      <CustomAudioPlayer src={beat.mp3Url} debugLabel={beat.title} />
+      <CustomAudioPlayer src={beat.mp3Url} debugLabel={beat.title} trackId={beat.id} />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <button
