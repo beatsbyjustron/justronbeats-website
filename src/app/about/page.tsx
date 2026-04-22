@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 export default function AboutPage() {
   return (
     <main className="max-w-2xl space-y-6">
@@ -21,9 +19,14 @@ export default function AboutPage() {
       </div>
       <p className="text-zinc-400">
         Follow the latest cookups and behind-the-scenes content on{" "}
-        <Link href="https://www.youtube.com" className="text-zinc-100 underline">
+        <a
+          href="https://www.youtube.com/@justron"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-100 underline"
+        >
           YouTube
-        </Link>
+        </a>
         .
       </p>
     </main>
