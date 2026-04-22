@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BeatCard } from "@/components/beat-card";
+import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
 import { Beat } from "@/components/types";
 
 type BeatStoreProps = {
@@ -10,8 +11,13 @@ type BeatStoreProps = {
 };
 
 export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
+  const { setQueue } = useGlobalAudioPlayer();
   const [expanded, setExpanded] = useState(false);
   const [expandedBeatId, setExpandedBeatId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setQueue(beats);
+  }, [beats, setQueue]);
 
   const visibleBeats = useMemo(
     () => (expanded ? beats : beats.slice(0, initiallyVisible)),

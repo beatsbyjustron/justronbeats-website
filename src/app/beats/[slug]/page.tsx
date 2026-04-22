@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BeatDetailContent } from "@/components/beat-detail-content";
-import { fetchBeatBySlug } from "@/lib/beats";
+import { fetchBeatBySlug, fetchBeats } from "@/lib/beats";
 
 type BeatPageProps = {
   params: Promise<{ slug: string }>;
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BeatPage({ params }: BeatPageProps) {
   const { slug } = await params;
-  const beat = await fetchBeatBySlug(slug);
+  const [beat, queueBeats] = await Promise.all([fetchBeatBySlug(slug), fetchBeats()]);
 
   if (!beat) {
     notFound();
@@ -25,7 +25,7 @@ export default async function BeatPage({ params }: BeatPageProps) {
       >
         Back to Home
       </Link>
-      <BeatDetailContent beat={beat} />
+      <BeatDetailContent beat={beat} queueBeats={queueBeats} />
     </main>
   );
 }

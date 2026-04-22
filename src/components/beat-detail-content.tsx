@@ -1,11 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Beat } from "@/components/types";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
+import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
 
 type BeatDetailContentProps = {
   beat: Beat;
+  queueBeats?: Beat[];
 };
 
 function formatProducerLine(extras: string[]) {
@@ -22,7 +24,8 @@ function formatProducerLine(extras: string[]) {
   return `Produced by Justron, ${allButLast}, and ${last}`;
 }
 
-export function BeatDetailContent({ beat }: BeatDetailContentProps) {
+export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) {
+  const { setQueue } = useGlobalAudioPlayer();
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
   const [offerEmail, setOfferEmail] = useState("");
   const [offerAmount, setOfferAmount] = useState("");
@@ -30,6 +33,10 @@ export function BeatDetailContent({ beat }: BeatDetailContentProps) {
   const [offerStatus, setOfferStatus] = useState("");
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+
+  useEffect(() => {
+    setQueue(queueBeats?.length ? queueBeats : [beat]);
+  }, [beat, queueBeats, setQueue]);
 
   const submitOffer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -107,7 +114,13 @@ export function BeatDetailContent({ beat }: BeatDetailContentProps) {
         </div>
       </div>
 
-      <CustomAudioPlayer src={beat.mp3Url} debugLabel={beat.title} trackId={beat.id} />
+      <CustomAudioPlayer
+        src={beat.mp3Url}
+        debugLabel={beat.title}
+        trackId={beat.id}
+        coverArtUrl={beat.coverArtUrl}
+        slug={beat.slug}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <button
