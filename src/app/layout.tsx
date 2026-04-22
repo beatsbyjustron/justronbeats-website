@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackgroundAmbience } from "@/components/background-ambience";
 import { GlobalAudioPlayerProvider } from "@/components/global-audio-player-provider";
 import "./globals.css";
 
@@ -22,7 +23,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body className="relative isolate overflow-x-hidden">
+        <BackgroundAmbience />
         <GlobalAudioPlayerProvider>
           <div className="mx-auto min-h-screen w-full max-w-6xl px-6 py-8 pb-28">
             <header className="mb-12 flex flex-wrap items-center justify-between gap-6 border-b border-zinc-800 pb-6">
