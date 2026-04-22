@@ -44,6 +44,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
   const [queue, setQueueState] = useState<QueueBeat[]>([]);
   const [currentBeat, setCurrentBeat] = useState<QueueBeat | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -108,6 +109,14 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
     if (!audio || !Number.isFinite(audio.duration)) return;
     audio.currentTime = time;
     setCurrentTime(time);
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const nextMuted = !audio.muted;
+    audio.muted = nextMuted;
+    setIsMuted(nextMuted);
   }, []);
 
   const currentIndex = currentBeat ? queue.findIndex((beat) => beat.id === currentBeat.id) : -1;
@@ -186,29 +195,35 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
 
       {currentBeat && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3">
-            <img
-              src={currentBeat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
-              alt={currentBeat.title}
-              className="h-12 w-12 rounded-lg object-cover"
+          <div className="border-b border-zinc-800/70 px-3 py-1.5">
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.01}
+              value={currentTime}
+              onChange={(event) => seekTo(Number(event.target.value))}
+              aria-label="Playback progress"
+              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-zinc-200"
             />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-zinc-100">{currentBeat.title}</p>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="w-10 text-[11px] text-zinc-500">{formatTime(currentTime)}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 0}
-                  step={0.01}
-                  value={currentTime}
-                  onChange={(event) => seekTo(Number(event.target.value))}
-                  className="h-1 w-full cursor-pointer appearance-none rounded bg-zinc-800 accent-zinc-200"
-                />
-                <span className="w-10 text-right text-[11px] text-zinc-500">{formatTime(duration)}</span>
+          </div>
+
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <img
+                src={currentBeat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
+                alt={currentBeat.title}
+                className="h-11 w-11 rounded-md object-cover"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-zinc-100">{currentBeat.title}</p>
+                <p className="text-[11px] text-zinc-500">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => void playPrevious()}
@@ -246,6 +261,30 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
                   <path d="M16 6h2v12h-2zM6 6l8 6-8 6z" />
                 </svg>
+              </button>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="rounded-full border border-zinc-700 p-2 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                aria-label={isMuted ? "Unmute audio" : "Mute audio"}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? (
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                    <path d="m16 9 5 5" />
+                    <path d="m21 9-5 5" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                    <path d="M18 6a8.5 8.5 0 0 1 0 12" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
