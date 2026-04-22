@@ -67,7 +67,9 @@ export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug 
             <span
               key={`${index}-${height}`}
               className={`w-1 rounded-full transition-all duration-100 ${
-                isCurrentBeat && isPlaying ? "bg-emerald-400 opacity-100" : "bg-zinc-600 opacity-40"
+                isCurrentBeat && isPlaying
+                  ? "bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300 opacity-100"
+                  : "bg-zinc-600 opacity-40"
               }`}
               style={{ height: `${height}px` }}
             />

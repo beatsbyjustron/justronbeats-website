@@ -327,7 +327,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
                 <span
                   key={`bottom-bar-${index}-${height}`}
                   className={`w-1 rounded-full transition-all duration-100 ${
-                    isPlaying ? "bg-emerald-400" : "bg-zinc-700"
+                    isPlaying ? "bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300" : "bg-zinc-700"
                   }`}
                   style={{ height: `${Math.max(6, Math.round(height * 0.75))}px` }}
                 />
