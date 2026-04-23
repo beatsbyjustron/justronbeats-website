@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
+import { isSupabasePublicObjectUrl } from "@/lib/storage";
 
 type CustomAudioPlayerProps = {
   src: string;
@@ -31,9 +32,11 @@ export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug 
 
   const progress = isCurrentBeat ? currentTime : 0;
   const totalDuration = isCurrentBeat ? duration : 0;
+  const safeSrc = isSupabasePublicObjectUrl(src) ? "" : src;
+  const safeCoverArtUrl = isSupabasePublicObjectUrl(coverArtUrl) ? "" : (coverArtUrl ?? "");
 
   const togglePlay = async () => {
-    if (!src) return;
+    if (!safeSrc) return;
     if (isCurrentBeat) {
       await togglePlayPause();
       return;
@@ -42,8 +45,8 @@ export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug 
       id: beatId,
       slug: slug || "",
       title: debugLabel || "Beat",
-      coverArtUrl: coverArtUrl || "",
-      mp3Url: src
+      coverArtUrl: safeCoverArtUrl,
+      mp3Url: safeSrc
     });
   };
 

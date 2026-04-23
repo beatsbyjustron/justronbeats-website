@@ -4,6 +4,7 @@ import { FormEvent, MouseEvent, useState } from "react";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { Beat } from "@/components/types";
 import { useRouter } from "next/navigation";
+import { isSupabasePublicObjectUrl } from "@/lib/storage";
 
 type BeatCardProps = {
   beat: Beat;
@@ -36,6 +37,9 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [showCopied, setShowCopied] = useState(false);
+  const [showLicenseTerms, setShowLicenseTerms] = useState(false);
+  const safeCoverArtUrl = isSupabasePublicObjectUrl(beat.coverArtUrl) ? "" : beat.coverArtUrl;
+  const safeMp3Url = isSupabasePublicObjectUrl(beat.mp3Url) ? "" : beat.mp3Url;
 
   const submitOffer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -144,7 +148,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
 
       <div className="mb-4 flex items-start gap-4">
         <img
-          src={beat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=500&q=80"}
+          src={safeCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=500&q=80"}
           alt={beat.title}
           className="h-20 w-20 rounded-xl object-cover"
         />
@@ -161,10 +165,10 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
       </div>
 
       <CustomAudioPlayer
-        src={beat.mp3Url}
+        src={safeMp3Url}
         debugLabel={beat.title}
         trackId={beat.id}
-        coverArtUrl={beat.coverArtUrl}
+        coverArtUrl={safeCoverArtUrl}
         slug={beat.slug}
       />
 
@@ -194,21 +198,33 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
         >
           {isExpanded ? "Hide related beats" : "Show related beats"}
         </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setShowLicenseTerms((prev) => !prev);
+          }}
+          className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:border-zinc-500"
+        >
+          {showLicenseTerms ? "Hide license terms" : "View license terms"}
+        </button>
       </div>
       {!!checkoutError && <p className="mb-4 text-xs text-amber-400">{checkoutError}</p>}
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
-          <p className="mb-1 font-semibold uppercase tracking-wide text-zinc-300">Lease</p>
-          Tagged MP3 file, up to 2,500 units, 50,000 streams. Singles, albums, and streaming use included. Justron
-          keeps ownership. Credit required: prod. justron.
+      {showLicenseTerms && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
+            <p className="mb-1 font-semibold uppercase tracking-wide text-zinc-300">Lease</p>
+            Tagged MP3 file, up to 2,500 units, 50,000 streams. Singles, albums, and streaming use included. Justron
+            keeps ownership. Credit required: prod. justron.
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
+            <p className="mb-1 font-semibold uppercase tracking-wide text-zinc-300">Exclusive</p>
+            Fully exclusive rights, unlimited copies and streams. WAV, MP3, and stems included. 50/50 publishing split.
+            Albums, singles, streaming, TV, and film use included. Credit required: prod. justron.
+          </div>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
-          <p className="mb-1 font-semibold uppercase tracking-wide text-zinc-300">Exclusive</p>
-          Fully exclusive rights, unlimited copies and streams. WAV, MP3, and stems included. 50/50 publishing split.
-          Albums, singles, streaming, TV, and film use included. Credit required: prod. justron.
-        </div>
-      </div>
+      )}
 
       {isExpanded && (
         <div className="mt-5 space-y-2 rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">

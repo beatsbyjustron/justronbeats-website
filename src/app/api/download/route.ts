@@ -1,18 +1,9 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { parseStorageReference } from "@/lib/storage";
 
 export const runtime = "nodejs";
-
-function parseStorageRef(mp3Url: string): { bucket: string; path: string } | null {
-  const publicMatch = mp3Url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/i);
-  if (publicMatch) return { bucket: publicMatch[1], path: publicMatch[2] };
-
-  const signedMatch = mp3Url.match(/\/storage\/v1\/object\/sign\/([^/]+)\/([^?]+)/i);
-  if (signedMatch) return { bucket: signedMatch[1], path: signedMatch[2] };
-
-  return null;
-}
 
 function safeFilename(title: string) {
   return (
@@ -54,7 +45,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Beat not found" }, { status: 404 });
     }
 
-    const ref = parseStorageRef(beat.mp3_url);
+    const ref = parseStorageReference(beat.mp3_url);
     if (!ref) {
       return NextResponse.json({ error: "Invalid file URL" }, { status: 400 });
     }

@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import { ProductionsGrid } from "@/components/productions-grid";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { toSignedStorageUrl } from "@/lib/storage";
+
+export const metadata: Metadata = {
+  title: "Productions | Justron Beats",
+  description: "Browse production credits from Justron and open each song on streaming platforms."
+};
 
 export const dynamic = "force-dynamic";
 
@@ -15,25 +22,6 @@ type ProductionRow = {
   year: number | null;
 };
 
-function normalizeStorageUrl(url: string | null) {
-  if (!url) return "";
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-
-  const supabaseBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const configuredBucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET;
-  const signedMatch = trimmed.match(/\/storage\/v1\/object\/sign\/([^/]+)\/([^?]+)/i);
-  if (signedMatch && supabaseBaseUrl) {
-    const bucketFromUrl = signedMatch[1];
-    const objectPath = signedMatch[2];
-    const bucket = configuredBucket || bucketFromUrl;
-    return `${supabaseBaseUrl}/storage/v1/object/public/${bucket}/${objectPath}`;
-  }
-
-  if (!configuredBucket) return trimmed;
-  return trimmed.replace(/(\/storage\/v1\/object\/public\/)[^/]+/i, `$1${configuredBucket}`);
-}
-
 export default async function ProductionsPage() {
   const supabase = getSupabaseServerClient();
   const { data } = supabase
@@ -42,10 +30,12 @@ export default async function ProductionsPage() {
         .select("id, title, artist, cover_url, spotify_url, apple_url, youtube_url, soundcloud_url, year, created_at")
         .order("created_at", { ascending: false })
     : { data: [] as ProductionRow[] };
-  const productions = ((data as ProductionRow[] | null) ?? []).map((row) => ({
-    ...row,
-    cover_url: normalizeStorageUrl(row.cover_url)
-  }));
+  const productions = await Promise.all(
+    ((data as ProductionRow[] | null) ?? []).map(async (row) => ({
+      ...row,
+      cover_url: supabase ? await toSignedStorageUrl(supabase, row.cover_url) : row.cover_url
+    }))
+  );
 
   return (
     <main className="space-y-8">

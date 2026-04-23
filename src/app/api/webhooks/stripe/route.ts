@@ -2,27 +2,21 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSignedUrlExpirySeconds, parseStorageReference } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
-function getStoragePath(url: string) {
-  const publicMatch = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/i);
-  if (publicMatch) return { bucket: publicMatch[1], path: publicMatch[2] };
-
-  const signedMatch = url.match(/\/storage\/v1\/object\/sign\/([^/]+)\/([^?]+)/i);
-  if (signedMatch) return { bucket: signedMatch[1], path: signedMatch[2] };
-
-  return null;
-}
-
 async function createSecureDownloadUrl(mp3Url: string) {
-  const parsed = getStoragePath(mp3Url);
+  const parsed = parseStorageReference(mp3Url);
   if (!parsed) return mp3Url;
 
   const supabase = getSupabaseServerClient();
   if (!supabase) return null;
 
-  const { data, error } = await supabase.storage.from(parsed.bucket).createSignedUrl(parsed.path, 60 * 60 * 24);
+  const { data, error } = await supabase
+    .storage
+    .from(parsed.bucket)
+    .createSignedUrl(parsed.path, Math.max(60 * 60 * 24, getSignedUrlExpirySeconds()));
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }

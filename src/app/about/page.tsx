@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About | Justron Beats",
+  description: "Learn about Justron, his production style, and major placements across the underground scene."
+};
+
 export default function AboutPage() {
   return (
     <main className="max-w-2xl space-y-6">
@@ -8,8 +15,9 @@ export default function AboutPage() {
           shoegaze, but bounce is in everything I make. I want every beat to feel melodic, hard, and alive.
         </p>
         <p>
-          I produced &quot;That One Song&quot; with Nettspend. Burberryerry reached out to me personally to listen to my beats
-          and give me advice. Glokk40Spazz also recorded over one of my beats, which meant a lot to me.
+          My placements include &quot;That One Song&quot; (Nettspend), &quot;Dip&quot; (Brennan Jones), &quot;On The Road&quot; (Hardrock),
+          &quot;34babyyyy&quot; (Backend), and &quot;Swagger Like Us&quot; (Slimesito). Burberryerry tapped in with me directly to hear
+          what I was building and share game.
         </p>
         <p>
           I earned my economics degree from UConn while growing my production business and competing in NCBA boxing. I
@@ -19,6 +27,33 @@ export default function AboutPage() {
       </div>
       <p className="text-zinc-400">
         Follow the latest cookups and behind-the-scenes content on{" "}
+        <a
+          href="https://www.instagram.com/justronbeats"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-100 underline"
+        >
+          Instagram
+        </a>
+        ,{" "}
+        <a
+          href="https://www.tiktok.com/@justronbeats"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-100 underline"
+        >
+          TikTok
+        </a>
+        ,{" "}
+        <a
+          href="https://soundcloud.com/justronbeats"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-100 underline"
+        >
+          SoundCloud
+        </a>
+        , and{" "}
         <a
           href="https://www.youtube.com/@justron"
           target="_blank"

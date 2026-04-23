@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useCallback } from "react";
 import { Beat } from "@/components/types";
+import { isSupabasePublicObjectUrl } from "@/lib/storage";
 
 type QueueBeat = Pick<Beat, "id" | "slug" | "title" | "coverArtUrl" | "mp3Url">;
 
@@ -31,12 +32,14 @@ function formatTime(seconds: number) {
 }
 
 function mapQueueBeat(beat: Beat | QueueBeat): QueueBeat {
+  const safeCoverArtUrl = isSupabasePublicObjectUrl(beat.coverArtUrl) ? "" : beat.coverArtUrl;
+  const safeMp3Url = isSupabasePublicObjectUrl(beat.mp3Url) ? "" : beat.mp3Url;
   return {
     id: beat.id,
     slug: beat.slug,
     title: beat.title,
-    coverArtUrl: beat.coverArtUrl,
-    mp3Url: beat.mp3Url
+    coverArtUrl: safeCoverArtUrl,
+    mp3Url: safeMp3Url
   };
 }
 
@@ -142,6 +145,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
 
     if (!isSameBeat) {
       setCurrentBeat(nextBeat);
+      if (!nextBeat.mp3Url || isSupabasePublicObjectUrl(nextBeat.mp3Url)) {
+        setIsPlaying(false);
+        return;
+      }
       audio.src = nextBeat.mp3Url;
       audio.currentTime = 0;
       setCurrentTime(0);

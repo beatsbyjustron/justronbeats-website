@@ -26,8 +26,7 @@ async function uploadFile(supabase: SupabaseClient<Database>, file: File, folder
 
   if (error) throw new Error(error.message);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 function getSupabaseAdminClient() {

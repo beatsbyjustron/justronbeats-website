@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import { ArtistTicker } from "@/components/artist-ticker";
 import { BeatStore } from "@/components/beat-store";
 import { FeaturedCarousel } from "@/components/featured-carousel";
 import { fetchBeats, mapFeaturedProductions } from "@/lib/beats";
+
+export const metadata: Metadata = {
+  title: "Home | Justron Beats",
+  description: "Shop official Justron Beats with secure previews, leases, and exclusive offers."
+};
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +29,7 @@ export default async function HomePage() {
       </section>
 
       <FeaturedCarousel productions={featuredProductions} />
-      <BeatStore beats={beats} initiallyVisible={4} />
+      <BeatStore beats={beats} initiallyVisible={beats.length} />
     </main>
   );
 }

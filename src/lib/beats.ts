@@ -1,5 +1,6 @@
 import { Beat, FeaturedProduction } from "@/components/types";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { isSupabasePublicObjectUrl, toSignedStorageUrl } from "@/lib/storage";
 
 type BeatRow = {
   id: string;
@@ -25,28 +26,6 @@ export function slugifyBeatTitle(title: string) {
     .replace(/-+/g, "-");
 }
 
-function normalizeStorageUrl(url: string | null) {
-  if (!url) return "";
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-
-  const supabaseBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const configuredBucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET;
-
-  // Convert signed URLs to public object URLs for public buckets.
-  const signedMatch = trimmed.match(/\/storage\/v1\/object\/sign\/([^/]+)\/([^?]+)/i);
-  if (signedMatch && supabaseBaseUrl) {
-    const bucketFromUrl = signedMatch[1];
-    const objectPath = signedMatch[2];
-    const bucket = configuredBucket || bucketFromUrl;
-    return `${supabaseBaseUrl}/storage/v1/object/public/${bucket}/${objectPath}`;
-  }
-
-  if (!configuredBucket) return trimmed;
-
-  return trimmed.replace(/(\/storage\/v1\/object\/public\/)[^/]+/i, `$1${configuredBucket}`);
-}
-
 function parseProducedBy(value: string | null): string[] {
   if (!value) return [];
   return value
@@ -55,7 +34,19 @@ function parseProducedBy(value: string | null): string[] {
     .filter(Boolean);
 }
 
-function mapBeat(row: BeatRow): Beat {
+async function mapBeat(row: BeatRow, supabase: NonNullable<ReturnType<typeof getSupabaseServerClient>>): Promise<Beat> {
+  const [coverArtUrl, mp3Url, wavUrl, stemsUrl] = await Promise.all([
+    toSignedStorageUrl(supabase, row.cover_art_url),
+    toSignedStorageUrl(supabase, row.mp3_url),
+    toSignedStorageUrl(supabase, row.wav_url),
+    toSignedStorageUrl(supabase, row.stems_url)
+  ]);
+
+  const safeCoverArtUrl = isSupabasePublicObjectUrl(coverArtUrl) ? "" : coverArtUrl;
+  const safeMp3Url = isSupabasePublicObjectUrl(mp3Url) ? "" : mp3Url;
+  const safeWavUrl = isSupabasePublicObjectUrl(wavUrl) ? "" : wavUrl;
+  const safeStemsUrl = isSupabasePublicObjectUrl(stemsUrl) ? "" : stemsUrl;
+
   return {
     id: row.id,
     slug: slugifyBeatTitle(row.title),
@@ -64,10 +55,10 @@ function mapBeat(row: BeatRow): Beat {
     bpm: row.bpm,
     key: row.key,
     tags: row.tags ?? [],
-    coverArtUrl: normalizeStorageUrl(row.cover_art_url),
-    mp3Url: normalizeStorageUrl(row.mp3_url),
-    wavUrl: normalizeStorageUrl(row.wav_url),
-    stemsUrl: normalizeStorageUrl(row.stems_url),
+    coverArtUrl: safeCoverArtUrl,
+    mp3Url: safeMp3Url,
+    wavUrl: safeWavUrl,
+    stemsUrl: safeStemsUrl,
     featured: Boolean(row.featured)
   };
 }
@@ -79,7 +70,7 @@ export async function fetchBeats(): Promise<Beat[]> {
   const { data, error } = await supabase.from("beats").select("*").order("created_at", { ascending: false });
   if (error || !data) return [];
 
-  return (data as BeatRow[]).map(mapBeat);
+  return Promise.all((data as BeatRow[]).map((row) => mapBeat(row, supabase)));
 }
 
 export async function fetchBeatBySlug(slug: string): Promise<Beat | null> {

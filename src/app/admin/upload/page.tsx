@@ -199,7 +199,6 @@ export default function AdminUploadPage() {
     const extension = getFileExtension(file.name);
     const path = `${folder}/${crypto.randomUUID()}.${extension}`;
 
-    // Public bucket upload from client to bypass server body-size limits.
     const { error } = await supabase.storage.from("beats").upload(path, file, {
       upsert: false,
       contentType: file.type || "application/octet-stream"
@@ -207,8 +206,7 @@ export default function AdminUploadPage() {
 
     if (error) throw error;
 
-    const { data } = supabase.storage.from("beats").getPublicUrl(path);
-    return data.publicUrl;
+    return path;
   };
 
   const setUploadStage = (key: UploadKey, stage: UploadStage) => {
@@ -644,7 +642,7 @@ export default function AdminUploadPage() {
 
         <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400">
           <p className="font-medium text-zinc-200">Client-side Uploading Enabled</p>
-          <p className="mt-1">Files are uploaded directly to the public `beats` bucket via Supabase Storage.</p>
+          <p className="mt-1">Files are uploaded directly to Supabase Storage and served via expiring signed URLs.</p>
         </div>
 
         <div className="grid gap-2 rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400 sm:grid-cols-2">

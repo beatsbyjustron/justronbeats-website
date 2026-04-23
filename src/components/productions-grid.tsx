@@ -48,25 +48,21 @@ export function ProductionsGrid({ productions }: { productions: ProductionItem[]
     <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {productions.map((production) => {
         const primaryUrl =
-          production.spotify_url ?? production.apple_url ?? production.youtube_url ?? production.soundcloud_url ?? null;
+          production.spotify_url ?? production.youtube_url ?? production.apple_url ?? production.soundcloud_url ?? null;
+        const Card = primaryUrl ? motion.a : motion.article;
 
         return (
-        <motion.article
-          key={production.id}
-          initial={{ opacity: 0, y: 28 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: false, amount: 0.3 }}
-          transition={{ duration: 0.45, ease: "easeOut" }}
-          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-zinc-800"
-          onClick={(event) => {
-            const target = event.target as HTMLElement;
-            if (target.closest("a")) return;
-            if (!primaryUrl) return;
-            if (typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches) {
-              window.open(primaryUrl, "_blank", "noopener,noreferrer");
-            }
-          }}
-        >
+          <Card
+            key={production.id}
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.3 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="group relative overflow-hidden rounded-2xl border border-zinc-800"
+            {...(primaryUrl
+              ? { href: primaryUrl, target: "_blank", rel: "noopener noreferrer", title: `Open ${production.title}` }
+              : {})}
+          >
           <img src={production.cover_url} alt={production.title} className="h-64 w-full object-cover" />
           <div className="absolute inset-0 flex items-end bg-black/60 p-4 opacity-100 transition duration-300 sm:opacity-0 sm:group-hover:opacity-100">
             <div>
@@ -77,54 +73,31 @@ export function ProductionsGrid({ productions }: { productions: ProductionItem[]
               </p>
               <div className="mt-2 flex items-center gap-2 text-zinc-200">
                 {production.spotify_url && (
-                  <a
-                    href={production.spotify_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                    className="rounded-full border border-zinc-600 p-2 transition hover:border-zinc-300"
-                  >
+                  <span className="rounded-full border border-zinc-600 p-2">
                     <PlatformIcon type="spotify" />
-                  </a>
+                  </span>
                 )}
                 {production.apple_url && (
-                  <a
-                    href={production.apple_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                    className="rounded-full border border-zinc-600 p-2 transition hover:border-zinc-300"
-                  >
+                  <span className="rounded-full border border-zinc-600 p-2">
                     <PlatformIcon type="apple" />
-                  </a>
+                  </span>
                 )}
                 {production.youtube_url && (
-                  <a
-                    href={production.youtube_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                    className="rounded-full border border-zinc-600 p-2 transition hover:border-zinc-300"
-                  >
+                  <span className="rounded-full border border-zinc-600 p-2">
                     <PlatformIcon type="youtube" />
-                  </a>
+                  </span>
                 )}
                 {production.soundcloud_url && (
-                  <a
-                    href={production.soundcloud_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                    className="rounded-full border border-zinc-600 p-2 transition hover:border-zinc-300"
-                  >
+                  <span className="rounded-full border border-zinc-600 p-2">
                     <PlatformIcon type="soundcloud" />
-                  </a>
+                  </span>
                 )}
               </div>
             </div>
           </div>
-        </motion.article>
-      )})}
+          </Card>
+        );
+      })}
       {!productions.length && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-sm text-zinc-400">No productions added yet.</div>
       )}
