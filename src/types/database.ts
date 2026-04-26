@@ -95,6 +95,28 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["productions"]["Insert"]>;
         Relationships: [];
       };
+      drum_kits: {
+        Row: {
+          id: string;
+          created_at: string;
+          name: string;
+          description: string | null;
+          price: number;
+          image_path: string | null;
+          zip_path: string;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          name: string;
+          description?: string | null;
+          price?: number;
+          image_path?: string | null;
+          zip_path: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["drum_kits"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

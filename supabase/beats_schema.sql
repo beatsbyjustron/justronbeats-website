@@ -40,6 +40,16 @@ create table if not exists public.productions (
   year int
 );
 
+create table if not exists public.drum_kits (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  name text not null,
+  description text,
+  price numeric not null default 0,
+  image_path text,
+  zip_path text not null
+);
+
 alter table if exists public.productions rename column song_title to title;
 alter table if exists public.productions rename column artist_name to artist;
 alter table if exists public.productions rename column cover_art_url to cover_url;

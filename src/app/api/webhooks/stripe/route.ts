@@ -21,6 +21,19 @@ async function createSecureDownloadUrl(mp3Url: string) {
   return data.signedUrl;
 }
 
+async function createSecureStorageDownloadUrl(pathValue: string) {
+  const parsed = parseStorageReference(pathValue);
+  if (!parsed) return pathValue;
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .storage
+    .from(parsed.bucket)
+    .createSignedUrl(parsed.path, Math.max(60 * 60 * 24, getSignedUrlExpirySeconds()));
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+
 export async function POST(request: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -52,9 +65,11 @@ export async function POST(request: Request) {
     }
 
     const customerEmail = session.customer_details?.email || session.customer_email;
-    const beatId = session.metadata?.beat_id || session.client_reference_id;
+    const itemType = session.metadata?.item_type === "drum_kit" ? "drum_kit" : "beat";
+    const beatId = session.metadata?.beat_id || (itemType === "beat" ? session.client_reference_id : "");
+    const drumKitId = session.metadata?.drum_kit_id || (itemType === "drum_kit" ? session.client_reference_id : "");
 
-    if (!customerEmail || !beatId) {
+    if (!customerEmail || (!beatId && !drumKitId)) {
       return NextResponse.json({ received: true });
     }
 
@@ -63,25 +78,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Supabase env configuration missing" }, { status: 500 });
     }
 
-    const { data: beat, error } = await supabase.from("beats").select("title, mp3_url").eq("id", beatId).single();
-    if (error || !beat?.mp3_url) {
-      return NextResponse.json({ received: true });
+    let downloadUrl = "";
+    let itemName = "your purchase";
+    if (itemType === "drum_kit") {
+      if (!drumKitId) return NextResponse.json({ received: true });
+      const { data: kit, error } = await supabase.from("drum_kits").select("name, zip_path").eq("id", drumKitId).single();
+      if (error || !kit?.zip_path) return NextResponse.json({ received: true });
+      const signed = await createSecureStorageDownloadUrl(kit.zip_path);
+      if (!signed) return NextResponse.json({ error: "Could not generate secure download URL" }, { status: 500 });
+      downloadUrl = signed;
+      itemName = kit.name || "your drum kit";
+    } else {
+      if (!beatId) return NextResponse.json({ received: true });
+      const { data: beat, error } = await supabase.from("beats").select("title, mp3_url").eq("id", beatId).single();
+      if (error || !beat?.mp3_url) return NextResponse.json({ received: true });
+      const signed = await createSecureDownloadUrl(beat.mp3_url);
+      if (!signed) return NextResponse.json({ error: "Could not generate secure download URL" }, { status: 500 });
+      downloadUrl = signed;
+      itemName = beat.title || "your beat";
     }
-
-    const downloadUrl = await createSecureDownloadUrl(beat.mp3_url);
-    if (!downloadUrl) {
-      return NextResponse.json({ error: "Could not generate secure download URL" }, { status: 500 });
-    }
-
-    const beatName = beat.title || "your beat";
     const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
     await resend.emails.send({
       from: fromEmail,
       to: customerEmail,
-      subject: `Your download link for ${beatName}`,
-      text: `Thanks for your purchase! Here is your download link for ${beatName}: ${downloadUrl}`,
-      html: `<p>Thanks for your purchase! Here is your download link for <strong>${beatName}</strong>.</p><p><a href="${downloadUrl}">Download your beat</a></p>`
+      subject: `Your download link for ${itemName}`,
+      text: `Thanks for your purchase! Here is your download link for ${itemName}: ${downloadUrl}`,
+      html: `<p>Thanks for your purchase! Here is your download link for <strong>${itemName}</strong>.</p><p><a href="${downloadUrl}">Download now</a></p>`
     });
 
     return NextResponse.json({ received: true });

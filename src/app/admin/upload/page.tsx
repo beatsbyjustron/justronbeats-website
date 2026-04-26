@@ -33,6 +33,14 @@ type AdminProduction = {
   soundcloud_url: string | null;
   year: number | null;
 };
+type AdminDrumKit = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image_path: string | null;
+  zip_path: string;
+};
 
 const initialStatus: Status = { type: "idle", message: "" };
 const initialUploadProgress: UploadProgress = {
@@ -58,6 +66,11 @@ const initialProductionForm = {
   soundcloudUrl: "",
   year: ""
 };
+const initialDrumKitForm = {
+  name: "",
+  description: "",
+  price: "0"
+};
 
 function getFileExtension(name: string) {
   const parts = name.split(".");
@@ -66,7 +79,7 @@ function getFileExtension(name: string) {
 
 export default function AdminUploadPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"beats" | "productions">("beats");
+  const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits">("beats");
   const [gatePassword, setGatePassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,8 +95,10 @@ export default function AdminUploadPage() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>(initialUploadProgress);
   const [beats, setBeats] = useState<AdminBeat[]>([]);
   const [productions, setProductions] = useState<AdminProduction[]>([]);
+  const [drumKits, setDrumKits] = useState<AdminDrumKit[]>([]);
   const [isLoadingBeats, setIsLoadingBeats] = useState(false);
   const [isLoadingProductions, setIsLoadingProductions] = useState(false);
+  const [isLoadingDrumKits, setIsLoadingDrumKits] = useState(false);
   const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deletingBeatId, setDeletingBeatId] = useState<string | null>(null);
@@ -95,6 +110,22 @@ export default function AdminUploadPage() {
   const [productionForm, setProductionForm] = useState(initialProductionForm);
   const [productionEditForm, setProductionEditForm] = useState(initialProductionForm);
   const [productionCoverArtFile, setProductionCoverArtFile] = useState<File | null>(null);
+  const [drumKitImageFile, setDrumKitImageFile] = useState<File | null>(null);
+  const [drumKitZipFile, setDrumKitZipFile] = useState<File | null>(null);
+  const [drumKitFileInputKey, setDrumKitFileInputKey] = useState(0);
+  const [drumKitForm, setDrumKitForm] = useState(initialDrumKitForm);
+  const [drumKitStatus, setDrumKitStatus] = useState<Status>(initialStatus);
+  const [isSubmittingDrumKit, setIsSubmittingDrumKit] = useState(false);
+  const [editingDrumKitId, setEditingDrumKitId] = useState<string | null>(null);
+  const [drumKitEditForm, setDrumKitEditForm] = useState(initialDrumKitForm);
+  const [drumKitEditImageFile, setDrumKitEditImageFile] = useState<File | null>(null);
+  const [drumKitEditZipFile, setDrumKitEditZipFile] = useState<File | null>(null);
+  const [drumKitEditPreview, setDrumKitEditPreview] = useState("");
+  const [drumKitEditImagePath, setDrumKitEditImagePath] = useState("");
+  const [drumKitEditZipPath, setDrumKitEditZipPath] = useState("");
+  const [drumKitEditInputKey, setDrumKitEditInputKey] = useState(0);
+  const [isSavingDrumKitEdit, setIsSavingDrumKitEdit] = useState(false);
+  const [deletingDrumKitId, setDeletingDrumKitId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     title: "",
     producerCredits: "",
@@ -182,6 +213,32 @@ export default function AdminUploadPage() {
     }
   };
 
+  const loadDrumKits = async () => {
+    setIsLoadingDrumKits(true);
+    setDrumKitStatus(initialStatus);
+    try {
+      const password = gatePassword || formPassword;
+      const response = await fetch("/api/admin/drum-kits", {
+        method: "GET",
+        headers: {
+          "x-admin-password": password
+        }
+      });
+      const result = (await response.json()) as { error?: string; kits?: AdminDrumKit[] };
+      if (!response.ok) {
+        setDrumKitStatus({ type: "error", message: result.error ?? "Failed to fetch drum kits." });
+        setIsLoadingDrumKits(false);
+        return;
+      }
+      setDrumKits(result.kits ?? []);
+      setIsLoadingDrumKits(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to fetch drum kits.";
+      setDrumKitStatus({ type: "error", message });
+      setIsLoadingDrumKits(false);
+    }
+  };
+
   const unlock = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (gatePassword === expectedPassword) {
@@ -197,6 +254,7 @@ export default function AdminUploadPage() {
     if (!isUnlocked) return;
     void loadBeats();
     void loadProductions();
+    void loadDrumKits();
   }, [isUnlocked]);
 
   useEffect(() => {
@@ -383,6 +441,152 @@ export default function AdminUploadPage() {
       alert(`Supabase upload rejected: ${message}`);
       setProductionStatus({ type: "error", message });
       setIsSubmittingProduction(false);
+    }
+  };
+
+  const submitDrumKit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmittingDrumKit(true);
+    setDrumKitStatus(initialStatus);
+    if (!drumKitForm.name.trim() || !drumKitZipFile) {
+      setDrumKitStatus({ type: "error", message: "Kit name and ZIP file are required." });
+      setIsSubmittingDrumKit(false);
+      return;
+    }
+    if (!supabase) {
+      setDrumKitStatus({ type: "error", message: "Missing Supabase client configuration." });
+      setIsSubmittingDrumKit(false);
+      return;
+    }
+    try {
+      const folder = `drum-kits/${drumKitForm.name.trim().toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+      const imagePath = drumKitImageFile ? await uploadToBeatsBucket(drumKitImageFile, folder) : "";
+      const zipPath = await uploadToBeatsBucket(drumKitZipFile, folder);
+      const response = await fetch("/api/admin/drum-kits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: formPassword,
+          name: drumKitForm.name.trim(),
+          description: drumKitForm.description.trim(),
+          price: Number(drumKitForm.price || 0),
+          imagePath,
+          zipPath
+        })
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setDrumKitStatus({ type: "error", message: result.error ?? "Failed to add drum kit." });
+        setIsSubmittingDrumKit(false);
+        return;
+      }
+      setDrumKitForm(initialDrumKitForm);
+      setDrumKitImageFile(null);
+      setDrumKitZipFile(null);
+      setDrumKitFileInputKey((prev) => prev + 1);
+      setDrumKitStatus({ type: "success", message: "Drum kit added successfully." });
+      await loadDrumKits();
+      setIsSubmittingDrumKit(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to add drum kit.";
+      setDrumKitStatus({ type: "error", message });
+      setIsSubmittingDrumKit(false);
+    }
+  };
+
+  const beginDrumKitEdit = (kit: AdminDrumKit) => {
+    setEditingDrumKitId(kit.id);
+    setDrumKitStatus(initialStatus);
+    setDrumKitEditForm({
+      name: kit.name,
+      description: kit.description ?? "",
+      price: String(kit.price ?? 0)
+    });
+    setDrumKitEditImagePath(String(kit.image_path ?? "").trim());
+    setDrumKitEditZipPath(String(kit.zip_path ?? "").trim());
+    setDrumKitEditImageFile(null);
+    setDrumKitEditZipFile(null);
+    setDrumKitEditInputKey((prev) => prev + 1);
+    setDrumKitEditPreview("");
+    if (kit.image_path) {
+      void resolveSignedCoverPreview(kit.image_path).then((url) => setDrumKitEditPreview(url));
+    }
+  };
+
+  const saveDrumKitEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingDrumKitId) return;
+    setIsSavingDrumKitEdit(true);
+    setDrumKitStatus(initialStatus);
+    try {
+      let nextImagePath = drumKitEditImagePath.trim();
+      let nextZipPath = drumKitEditZipPath.trim();
+      const folder = `drum-kits/edits/${editingDrumKitId}-${Date.now()}`;
+      if (drumKitEditImageFile) {
+        nextImagePath = await uploadToBeatsBucket(drumKitEditImageFile, folder);
+      }
+      if (drumKitEditZipFile) {
+        nextZipPath = await uploadToBeatsBucket(drumKitEditZipFile, folder);
+      }
+      const response = await fetch("/api/admin/drum-kits", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": gatePassword || formPassword
+        },
+        body: JSON.stringify({
+          id: editingDrumKitId,
+          name: drumKitEditForm.name.trim(),
+          description: drumKitEditForm.description.trim(),
+          price: Number(drumKitEditForm.price || 0),
+          imagePath: nextImagePath || null,
+          zipPath: nextZipPath
+        })
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setDrumKitStatus({ type: "error", message: result.error ?? "Failed to update drum kit." });
+        setIsSavingDrumKitEdit(false);
+        return;
+      }
+      setDrumKitStatus({ type: "success", message: "Drum kit updated successfully." });
+      setEditingDrumKitId(null);
+      await loadDrumKits();
+      setIsSavingDrumKitEdit(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update drum kit.";
+      setDrumKitStatus({ type: "error", message });
+      setIsSavingDrumKitEdit(false);
+    }
+  };
+
+  const deleteDrumKit = async (id: string) => {
+    const confirmed = window.confirm("Delete this drum kit permanently?");
+    if (!confirmed) return;
+    setDeletingDrumKitId(id);
+    setDrumKitStatus(initialStatus);
+    try {
+      const response = await fetch("/api/admin/drum-kits", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": gatePassword || formPassword
+        },
+        body: JSON.stringify({ id })
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setDrumKitStatus({ type: "error", message: result.error ?? "Failed to delete drum kit." });
+        setDeletingDrumKitId(null);
+        return;
+      }
+      setDrumKitStatus({ type: "success", message: "Drum kit deleted successfully." });
+      await loadDrumKits();
+      setDeletingDrumKitId(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete drum kit.";
+      setDrumKitStatus({ type: "error", message });
+      setDeletingDrumKitId(null);
     }
   };
 
@@ -640,6 +844,17 @@ export default function AdminUploadPage() {
           }`}
         >
           Productions
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("drumKits")}
+          className={`rounded-full px-4 py-2 text-sm transition ${
+            activeTab === "drumKits"
+              ? "bg-zinc-100 font-semibold text-zinc-900"
+              : "border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          Drum Kits
         </button>
       </div>
 
@@ -1151,6 +1366,204 @@ export default function AdminUploadPage() {
           </div>
         )}
       </section>
+      )}
+
+      {activeTab === "drumKits" && (
+        <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold text-zinc-100">Drum Kits Management</h2>
+            <button
+              type="button"
+              onClick={() => void loadDrumKits()}
+              className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-200 transition hover:border-zinc-500"
+            >
+              Refresh
+            </button>
+          </div>
+          <form onSubmit={submitDrumKit} className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+            <input
+              placeholder="Kit name"
+              required
+              value={drumKitForm.name}
+              onChange={(event) => setDrumKitForm((prev) => ({ ...prev, name: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <textarea
+              placeholder="Description"
+              rows={3}
+              value={drumKitForm.description}
+              onChange={(event) => setDrumKitForm((prev) => ({ ...prev, description: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              placeholder="Price (USD) - 0 for free"
+              value={drumKitForm.price}
+              onChange={(event) => setDrumKitForm((prev) => ({ ...prev, price: event.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
+                Cover image (optional)
+                <input
+                  key={`drumkit-image-${drumKitFileInputKey}`}
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setDrumKitImageFile(event.target.files?.[0] ?? null)}
+                  className="mt-2 block w-full text-xs text-zinc-400"
+                />
+              </label>
+              <label className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
+                ZIP file
+                <input
+                  key={`drumkit-zip-${drumKitFileInputKey}`}
+                  type="file"
+                  accept=".zip,application/zip"
+                  required
+                  onChange={(event) => setDrumKitZipFile(event.target.files?.[0] ?? null)}
+                  className="mt-2 block w-full text-xs text-zinc-400"
+                />
+              </label>
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmittingDrumKit}
+              className="w-max rounded-full bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:opacity-60"
+            >
+              {isSubmittingDrumKit ? "Adding..." : "Add Drum Kit"}
+            </button>
+          </form>
+
+          {drumKitStatus.message && (
+            <p className={drumKitStatus.type === "error" ? "text-sm text-red-400" : "text-sm text-emerald-400"}>{drumKitStatus.message}</p>
+          )}
+
+          {isLoadingDrumKits ? (
+            <p className="text-sm text-zinc-400">Loading drum kits...</p>
+          ) : !drumKits.length ? (
+            <p className="text-sm text-zinc-400">No drum kits added yet.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {drumKits.map((kit) => (
+                <article key={kit.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
+                  {editingDrumKitId === kit.id ? (
+                    <form onSubmit={saveDrumKitEdit} className="grid gap-3">
+                      <input
+                        value={drumKitEditForm.name}
+                        onChange={(event) => setDrumKitEditForm((prev) => ({ ...prev, name: event.target.value }))}
+                        placeholder="Kit name"
+                        required
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                      <textarea
+                        rows={3}
+                        value={drumKitEditForm.description}
+                        onChange={(event) => setDrumKitEditForm((prev) => ({ ...prev, description: event.target.value }))}
+                        placeholder="Description"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={drumKitEditForm.price}
+                        onChange={(event) => setDrumKitEditForm((prev) => ({ ...prev, price: event.target.value }))}
+                        placeholder="Price (USD)"
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                      />
+                      <div className="grid gap-2">
+                        <p className="text-xs text-zinc-400">Cover image</p>
+                        {drumKitEditPreview ? (
+                          <img src={drumKitEditPreview} alt="Kit preview" className="h-24 w-24 rounded-lg object-cover" />
+                        ) : (
+                          <p className="text-xs text-zinc-500">No cover image</p>
+                        )}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300">
+                          Replace cover image
+                          <input
+                            key={`drumkit-edit-image-${drumKitEditInputKey}`}
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null;
+                              setDrumKitEditImageFile(file);
+                              if (!file) {
+                                void resolveSignedCoverPreview(drumKitEditImagePath).then((url) => setDrumKitEditPreview(url));
+                                return;
+                              }
+                              setDrumKitEditPreview(URL.createObjectURL(file));
+                            }}
+                            className="mt-2 block w-full text-xs text-zinc-400"
+                          />
+                        </label>
+                        <label className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300">
+                          Replace ZIP file
+                          <input
+                            key={`drumkit-edit-zip-${drumKitEditInputKey}`}
+                            type="file"
+                            accept=".zip,application/zip"
+                            onChange={(event) => setDrumKitEditZipFile(event.target.files?.[0] ?? null)}
+                            className="mt-2 block w-full text-xs text-zinc-400"
+                          />
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={isSavingDrumKitEdit}
+                          className="rounded-full bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:opacity-60"
+                        >
+                          {isSavingDrumKitEdit ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingDrumKitId(null);
+                            setDrumKitEditImageFile(null);
+                            setDrumKitEditZipFile(null);
+                            setDrumKitEditPreview("");
+                          }}
+                          className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition hover:border-zinc-500"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="font-medium text-zinc-100">{kit.name}</p>
+                        <p className="text-xs text-zinc-400">{kit.description || "No description"}</p>
+                        <p className="text-xs text-zinc-500">{Number(kit.price) <= 0 ? "Free" : `$${Number(kit.price).toFixed(2)}`}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => beginDrumKitEdit(kit)}
+                          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteDrumKit(kit.id)}
+                          disabled={deletingDrumKitId === kit.id}
+                          className="rounded-full border border-red-500/60 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-950/60 disabled:opacity-60"
+                        >
+                          {deletingDrumKitId === kit.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       )}
     </main>
   );

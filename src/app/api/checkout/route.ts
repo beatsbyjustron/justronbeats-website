@@ -20,12 +20,16 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as {
       beatId?: string;
+      drumKitId?: string;
+      itemType?: "beat" | "drum_kit";
       title?: string;
       image?: string;
       priceCents?: number;
     };
 
+    const itemType = body.itemType === "drum_kit" ? "drum_kit" : "beat";
     const beatId = body.beatId?.trim() || "";
+    const drumKitId = body.drumKitId?.trim() || "";
     const title = body.title?.trim() || "Beat Lease";
     const image = body.image?.trim() || "";
     const priceCents = Number(body.priceCents ?? 3000);
@@ -35,7 +39,7 @@ export async function POST(request: Request) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      ...(beatId ? { client_reference_id: beatId } : {}),
+      ...((itemType === "beat" ? beatId : drumKitId) ? { client_reference_id: itemType === "beat" ? beatId : drumKitId } : {}),
       line_items: [
         {
           quantity: 1,
@@ -43,15 +47,17 @@ export async function POST(request: Request) {
             currency: "usd",
             unit_amount: unitAmount,
             product_data: {
-              name: `${title} - Lease`,
+              name: itemType === "drum_kit" ? `${title} - Drum Kit` : `${title} - Lease`,
               ...(image ? { images: [image] } : {})
             }
           }
         }
       ],
       metadata: {
-        beat_id: beatId,
-        license_tier: "lease"
+        item_type: itemType,
+        beat_id: itemType === "beat" ? beatId : "",
+        drum_kit_id: itemType === "drum_kit" ? drumKitId : "",
+        license_tier: itemType === "beat" ? "lease" : "drum_kit"
       },
       success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/`
