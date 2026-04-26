@@ -19,6 +19,8 @@ create table if not exists public.beats (
   exclusive_terms text
 );
 
+create index if not exists beats_tags_gin_idx on public.beats using gin (tags);
+
 create table if not exists public.beat_offers (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),

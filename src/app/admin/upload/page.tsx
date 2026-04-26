@@ -77,6 +77,13 @@ function getFileExtension(name: string) {
   return parts.length > 1 ? parts[parts.length - 1] : "bin";
 }
 
+function parseTagsInput(value: string) {
+  return value
+    .split(/[\s,]+/)
+    .map((tag) => tag.trim().replace(/^#+/, "").toLowerCase())
+    .filter(Boolean);
+}
+
 export default function AdminUploadPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits">("beats");
@@ -729,9 +736,8 @@ export default function AdminUploadPage() {
           key: editForm.key.trim(),
           bpm: Number(editForm.bpm || 0),
           tags: editForm.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
+            ? parseTagsInput(editForm.tags)
+            : [],
           featured: editForm.featured,
           coverArtPath: nextCoverPath || null
         })
@@ -895,7 +901,7 @@ export default function AdminUploadPage() {
         </div>
         <input
           name="tags"
-          placeholder="Tags/genre (comma separated)"
+          placeholder="Tags (space or comma separated, e.g. #nettspend #osamason #drill)"
           value={uploadForm.tags}
           onChange={(event) => setUploadForm((prev) => ({ ...prev, tags: event.target.value }))}
           className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
@@ -1068,7 +1074,7 @@ export default function AdminUploadPage() {
                     <input
                       value={editForm.tags}
                       onChange={(event) => setEditForm((prev) => ({ ...prev, tags: event.target.value }))}
-                      placeholder="Tags (comma separated)"
+                      placeholder="Tags (space or comma separated)"
                       className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
                     />
                     <label className="flex items-center gap-2 text-sm text-zinc-300">

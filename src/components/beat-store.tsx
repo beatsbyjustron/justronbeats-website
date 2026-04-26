@@ -14,17 +14,30 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
   const { setQueue } = useGlobalAudioPlayer();
   const [expanded, setExpanded] = useState(false);
   const [expandedBeatId, setExpandedBeatId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     setQueue(beats);
   }, [beats, setQueue]);
 
+  const filteredBeats = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return beats;
+
+    return beats.filter((beat) => {
+      const matchesTitle = beat.title.toLowerCase().includes(query);
+      const matchesArtists = beat.producedBy.some((artist) => artist.toLowerCase().includes(query));
+      const matchesTags = beat.tags.some((tag) => tag.toLowerCase().includes(query));
+      return matchesTitle || matchesArtists || matchesTags;
+    });
+  }, [beats, searchQuery]);
+
   const visibleBeats = useMemo(
-    () => (expanded ? beats : beats.slice(0, initiallyVisible)),
-    [beats, expanded, initiallyVisible]
+    () => (expanded ? filteredBeats : filteredBeats.slice(0, initiallyVisible)),
+    [filteredBeats, expanded, initiallyVisible]
   );
 
-  const hasMore = beats.length > initiallyVisible;
+  const hasMore = filteredBeats.length > initiallyVisible;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -55,7 +68,7 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
   }, [beats, initiallyVisible]);
 
   const getSuggestions = (currentBeat: Beat) => {
-    return beats
+    return filteredBeats
       .filter((beat) => beat.id !== currentBeat.id)
       .map((beat) => {
         const bpmDiff = Math.abs(beat.bpm - currentBeat.bpm);
@@ -70,16 +83,36 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
 
   return (
     <section className="space-y-4">
+      <div className="space-y-2">
+        <label htmlFor="beat-search" className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+          Search Beats
+        </label>
+        <input
+          id="beat-search"
+          type="text"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search by beat name, artist, or tags..."
+          className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none ring-zinc-500 placeholder:text-zinc-500 focus:ring-2"
+        />
+      </div>
+
       <div className="space-y-4 transition-all duration-500">
-        {visibleBeats.map((beat) => (
-          <BeatCard
-            key={beat.id}
-            beat={beat}
-            isExpanded={expandedBeatId === beat.id}
-            onToggle={() => setExpandedBeatId((prev) => (prev === beat.id ? null : beat.id))}
-            suggestions={getSuggestions(beat)}
-          />
-        ))}
+        {visibleBeats.length ? (
+          visibleBeats.map((beat) => (
+            <BeatCard
+              key={beat.id}
+              beat={beat}
+              isExpanded={expandedBeatId === beat.id}
+              onToggle={() => setExpandedBeatId((prev) => (prev === beat.id ? null : beat.id))}
+              suggestions={getSuggestions(beat)}
+            />
+          ))
+        ) : (
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-sm text-zinc-400">
+            No beats found.
+          </div>
+        )}
       </div>
 
       {hasMore && (

@@ -44,6 +44,13 @@ function hasValidAdminPassword(request: Request) {
   return headerPassword === ADMIN_PASSWORD;
 }
 
+function parseTagsInput(value: string) {
+  return value
+    .split(/[\s,]+/)
+    .map((item) => item.trim().replace(/^#+/, "").toLowerCase())
+    .filter(Boolean);
+}
+
 export async function GET(request: Request) {
   if (!hasValidAdminPassword(request)) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
@@ -195,10 +202,7 @@ export async function POST(request: Request) {
     const parsedBpm = Number(formData.get("bpm") ?? 0);
     const key = providedKey || "Unknown";
     const bpm = Number.isFinite(parsedBpm) && parsedBpm > 0 ? parsedBpm : 0;
-    const tags = String(formData.get("tags") ?? "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const tags = parseTagsInput(String(formData.get("tags") ?? ""));
     const featured = String(formData.get("featured") ?? "false") === "true";
 
     const providedCoverArtUrl = String(formData.get("coverArtUrl") ?? "").trim();
