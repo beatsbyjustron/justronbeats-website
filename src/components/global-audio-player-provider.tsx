@@ -383,11 +383,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
 
           <div className="px-3 py-2.5 sm:px-4 sm:py-3">
             <div className="mx-auto flex w-full max-w-6xl items-center gap-2 sm:gap-3">
-              <img
-                src={resolvedCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
-                alt={currentBeat.title}
-                className="h-9 w-9 rounded-md object-cover sm:h-11 sm:w-11"
-              />
+              {resolvedCoverArtUrl ? (
+                <img src={resolvedCoverArtUrl} alt={currentBeat.title} className="h-9 w-9 rounded-md object-cover sm:h-11 sm:w-11" />
+              ) : (
+                <div className="h-9 w-9 animate-pulse rounded-md border border-zinc-800 bg-zinc-900 sm:h-11 sm:w-11" aria-hidden="true" />
+              )}
               <div className="min-w-0 max-w-[130px] sm:max-w-[220px]">
                 <p className="truncate text-xs font-medium text-zinc-100 sm:text-sm">{currentBeat.title}</p>
                 <p className="text-[10px] text-zinc-500 sm:text-[11px]">

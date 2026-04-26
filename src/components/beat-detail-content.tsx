@@ -102,11 +102,14 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
   return (
     <section className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex flex-col gap-4 sm:flex-row">
-        <img
-          src={signedCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=800&q=80"}
-          alt={beat.title}
-          className="h-48 w-full rounded-xl object-cover sm:h-52 sm:w-52"
-        />
+        {signedCoverArtUrl ? (
+          <img src={signedCoverArtUrl} alt={beat.title} className="h-48 w-full rounded-xl object-cover sm:h-52 sm:w-52" />
+        ) : (
+          <div
+            className="h-48 w-full animate-pulse rounded-xl border border-zinc-800 bg-zinc-900 sm:h-52 sm:w-52"
+            aria-hidden="true"
+          />
+        )}
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold text-zinc-100">{beat.title}</h1>
           <p className="text-zinc-400">{formatProducerLine(beat.producedBy)}</p>

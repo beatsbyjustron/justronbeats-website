@@ -12,11 +12,11 @@ function FeaturedCarouselCard({ item }: { item: FeaturedProduction }) {
   const signedCoverUrl = useSignedStorageUrl(item.coverArt);
   return (
     <article className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-      <img
-        src={signedCoverUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=800&q=80"}
-        alt={item.song}
-        className="h-44 w-full object-cover"
-      />
+      {signedCoverUrl ? (
+        <img src={signedCoverUrl} alt={item.song} className="h-44 w-full object-cover" />
+      ) : (
+        <div className="h-44 w-full animate-pulse bg-zinc-900" aria-hidden="true" />
+      )}
       <div className="space-y-1 p-3">
         <p className="font-medium text-zinc-100">{item.song}</p>
         <p className="text-sm text-zinc-400">{item.artist}</p>

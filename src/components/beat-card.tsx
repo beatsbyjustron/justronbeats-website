@@ -146,11 +146,11 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
       </div>
 
       <div className="mb-4 flex items-start gap-4">
-        <img
-          src={signedCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=500&q=80"}
-          alt={beat.title}
-          className="h-20 w-20 rounded-xl object-cover"
-        />
+        {signedCoverArtUrl ? (
+          <img src={signedCoverArtUrl} alt={beat.title} className="h-20 w-20 rounded-xl object-cover" />
+        ) : (
+          <div className="h-20 w-20 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900" aria-hidden="true" />
+        )}
         <div>
           <h3 className="text-lg font-semibold text-zinc-100">{beat.title}</h3>
           <p className="text-sm text-zinc-400">{formatProducerLine(beat.producedBy)}</p>

@@ -78,11 +78,11 @@ export function KitsGrid({ kits }: { kits: DrumKitItem[] }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {kits.map((kit) => (
           <article key={kit.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
-            <img
-              src={kit.imageUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=800&q=80"}
-              alt={kit.name}
-              className="h-44 w-full rounded-xl object-cover"
-            />
+            {kit.imageUrl ? (
+              <img src={kit.imageUrl} alt={kit.name} className="h-44 w-full rounded-xl object-cover" />
+            ) : (
+              <div className="h-44 w-full animate-pulse rounded-xl border border-zinc-800 bg-zinc-900" aria-hidden="true" />
+            )}
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold text-zinc-100">{kit.name}</h2>
