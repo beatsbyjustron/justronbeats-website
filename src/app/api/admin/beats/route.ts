@@ -45,9 +45,9 @@ function hasValidAdminPassword(request: Request) {
 }
 
 function parseTagsInput(value: string) {
-  return value
-    .split(/[\s,]+/)
-    .map((item) => item.trim().replace(/^#+/, "").toLowerCase())
+  const segments = value.match(/#[^#,\n]+|[^,\n]+/g) ?? [];
+  return segments
+    .map((segment) => segment.trim().replace(/^#+/, "").replace(/\s+/g, "").toLowerCase())
     .filter(Boolean);
 }
 
@@ -127,7 +127,11 @@ export async function PATCH(request: Request) {
       producer_credits: String(body.producerCredits ?? "").trim(),
       key: String(body.key ?? "").trim() || "Unknown",
       bpm: Number.isFinite(Number(body.bpm)) ? Math.max(0, Number(body.bpm)) : 0,
-      tags: Array.isArray(body.tags) ? body.tags : [],
+      tags: Array.isArray(body.tags)
+        ? body.tags
+            .map((item) => String(item).trim().replace(/^#+/, "").replace(/\s+/g, "").toLowerCase())
+            .filter(Boolean)
+        : [],
       featured: Boolean(body.featured),
       ...(nextCoverArtPath !== undefined ? { cover_art_url: nextCoverArtPath } : {})
     };

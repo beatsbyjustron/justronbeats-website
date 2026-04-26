@@ -11,6 +11,7 @@ type BeatCardProps = {
   isExpanded: boolean;
   onToggle: () => void;
   suggestions: Beat[];
+  onTagClick?: (tag: string) => void;
 };
 
 function formatProducerLine(extras: string[]) {
@@ -27,7 +28,7 @@ function formatProducerLine(extras: string[]) {
   return `Produced by Justron, ${allButLast}, and ${last}`;
 }
 
-export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardProps) {
+export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }: BeatCardProps) {
   const router = useRouter();
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
   const [offerEmail, setOfferEmail] = useState("");
@@ -158,7 +159,21 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
             {beat.bpm} BPM • {beat.key}
           </p>
           {!!beat.tags.length && (
-            <p className="mt-1 text-xs text-zinc-500">{beat.tags.map((tag) => `#${tag}`).join(" ")}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {beat.tags.map((tag) => (
+                <button
+                  key={`${beat.id}-${tag}`}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onTagClick?.(tag);
+                  }}
+                  className="rounded-full border border-zinc-700 bg-zinc-950/90 px-2.5 py-1 text-[11px] text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

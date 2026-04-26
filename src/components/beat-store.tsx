@@ -10,6 +10,10 @@ type BeatStoreProps = {
   initiallyVisible?: number;
 };
 
+function normalizeTagValue(value: string) {
+  return value.toLowerCase().replace(/\s+/g, "").trim();
+}
+
 export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
   const { setQueue } = useGlobalAudioPlayer();
   const [expanded, setExpanded] = useState(false);
@@ -22,12 +26,13 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
 
   const filteredBeats = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
+    const normalizedTagQuery = normalizeTagValue(query);
     if (!query) return beats;
 
     return beats.filter((beat) => {
       const matchesTitle = beat.title.toLowerCase().includes(query);
       const matchesArtists = beat.producedBy.some((artist) => artist.toLowerCase().includes(query));
-      const matchesTags = beat.tags.some((tag) => tag.toLowerCase().includes(query));
+      const matchesTags = beat.tags.some((tag) => normalizeTagValue(tag).includes(normalizedTagQuery));
       return matchesTitle || matchesArtists || matchesTags;
     });
   }, [beats, searchQuery]);
@@ -106,6 +111,7 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
               isExpanded={expandedBeatId === beat.id}
               onToggle={() => setExpandedBeatId((prev) => (prev === beat.id ? null : beat.id))}
               suggestions={getSuggestions(beat)}
+              onTagClick={(tag) => setSearchQuery(tag)}
             />
           ))
         ) : (

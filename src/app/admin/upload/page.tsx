@@ -78,9 +78,9 @@ function getFileExtension(name: string) {
 }
 
 function parseTagsInput(value: string) {
-  return value
-    .split(/[\s,]+/)
-    .map((tag) => tag.trim().replace(/^#+/, "").toLowerCase())
+  const segments = value.match(/#[^#,\n]+|[^,\n]+/g) ?? [];
+  return segments
+    .map((segment) => segment.trim().replace(/^#+/, "").replace(/\s+/g, "").toLowerCase())
     .filter(Boolean);
 }
 
@@ -901,7 +901,7 @@ export default function AdminUploadPage() {
         </div>
         <input
           name="tags"
-          placeholder="Tags (space or comma separated, e.g. #nettspend #osamason #drill)"
+          placeholder="Tags (comma separated, e.g. lil uzi vert, osamason, drill)"
           value={uploadForm.tags}
           onChange={(event) => setUploadForm((prev) => ({ ...prev, tags: event.target.value }))}
           className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
@@ -1074,7 +1074,7 @@ export default function AdminUploadPage() {
                     <input
                       value={editForm.tags}
                       onChange={(event) => setEditForm((prev) => ({ ...prev, tags: event.target.value }))}
-                      placeholder="Tags (space or comma separated)"
+                      placeholder="Tags (comma separated)"
                       className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
                     />
                     <label className="flex items-center gap-2 text-sm text-zinc-300">
