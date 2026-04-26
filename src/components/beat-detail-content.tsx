@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Beat } from "@/components/types";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
-import { isSupabasePublicObjectUrl } from "@/lib/storage";
+import { useSignedStorageUrl } from "@/components/use-signed-storage-url";
 
 type BeatDetailContentProps = {
   beat: Beat;
@@ -35,8 +35,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [showLicenseTerms, setShowLicenseTerms] = useState(false);
-  const safeCoverArtUrl = isSupabasePublicObjectUrl(beat.coverArtUrl) ? "" : beat.coverArtUrl;
-  const safeMp3Url = isSupabasePublicObjectUrl(beat.mp3Url) ? "" : beat.mp3Url;
+  const signedCoverArtUrl = useSignedStorageUrl(beat.coverArtUrl);
 
   useEffect(() => {
     setQueue(queueBeats?.length ? queueBeats : [beat]);
@@ -104,7 +103,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
     <section className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex flex-col gap-4 sm:flex-row">
         <img
-          src={safeCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=800&q=80"}
+          src={signedCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=800&q=80"}
           alt={beat.title}
           className="h-48 w-full rounded-xl object-cover sm:h-52 sm:w-52"
         />
@@ -119,10 +118,10 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
       </div>
 
       <CustomAudioPlayer
-        src={safeMp3Url}
+        src={beat.mp3Url}
         debugLabel={beat.title}
         trackId={beat.id}
-        coverArtUrl={safeCoverArtUrl}
+        coverArtUrl={signedCoverArtUrl}
         slug={beat.slug}
       />
 

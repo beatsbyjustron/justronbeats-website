@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { Database } from "@/types/database";
+import { parseStorageReference } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("beats")
-    .select("id, title, producer_credits, key, bpm, tags, featured, created_at")
+    .select("id, title, producer_credits, key, bpm, tags, featured, cover_art_url, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -84,6 +85,7 @@ export async function PATCH(request: Request) {
       bpm?: number;
       tags?: string[];
       featured?: boolean;
+      coverArtPath?: string | null;
     };
 
     const id = String(body.id ?? "").trim();
@@ -96,18 +98,44 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Title is required." }, { status: 400 });
     }
 
+    const { data: existingBeat, error: existingBeatError } = await supabase
+      .from("beats")
+      .select("cover_art_url")
+      .eq("id", id)
+      .single();
+    if (existingBeatError) {
+      return NextResponse.json({ error: existingBeatError.message }, { status: 500 });
+    }
+
+    const nextCoverArtPathRaw = body.coverArtPath;
+    const nextCoverArtPath =
+      typeof nextCoverArtPathRaw === "string"
+        ? nextCoverArtPathRaw.trim() || null
+        : nextCoverArtPathRaw === null
+          ? null
+          : undefined;
+
     const payload = {
       title,
       producer_credits: String(body.producerCredits ?? "").trim(),
       key: String(body.key ?? "").trim() || "Unknown",
       bpm: Number.isFinite(Number(body.bpm)) ? Math.max(0, Number(body.bpm)) : 0,
       tags: Array.isArray(body.tags) ? body.tags : [],
-      featured: Boolean(body.featured)
+      featured: Boolean(body.featured),
+      ...(nextCoverArtPath !== undefined ? { cover_art_url: nextCoverArtPath } : {})
     };
 
     const { error } = await supabase.from("beats").update(payload).eq("id", id);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const previousCoverArtPath = String(existingBeat?.cover_art_url ?? "").trim();
+    if (nextCoverArtPath && previousCoverArtPath && previousCoverArtPath !== nextCoverArtPath) {
+      const previousRef = parseStorageReference(previousCoverArtPath);
+      if (previousRef) {
+        await supabase.storage.from(previousRef.bucket).remove([previousRef.path]);
+      }
     }
 
     revalidatePath("/");

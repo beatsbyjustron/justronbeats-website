@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useCallback } from "react";
 import { Beat } from "@/components/types";
-import { isSupabasePublicObjectUrl } from "@/lib/storage";
+import { getSignedUrlFromApi } from "@/lib/signed-url-client";
 
 type QueueBeat = Pick<Beat, "id" | "slug" | "title" | "coverArtUrl" | "mp3Url">;
 
@@ -32,14 +32,12 @@ function formatTime(seconds: number) {
 }
 
 function mapQueueBeat(beat: Beat | QueueBeat): QueueBeat {
-  const safeCoverArtUrl = isSupabasePublicObjectUrl(beat.coverArtUrl) ? "" : beat.coverArtUrl;
-  const safeMp3Url = isSupabasePublicObjectUrl(beat.mp3Url) ? "" : beat.mp3Url;
   return {
     id: beat.id,
     slug: beat.slug,
     title: beat.title,
-    coverArtUrl: safeCoverArtUrl,
-    mp3Url: safeMp3Url
+    coverArtUrl: beat.coverArtUrl,
+    mp3Url: beat.mp3Url
   };
 }
 
@@ -57,6 +55,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
+  const [resolvedCoverArtUrl, setResolvedCoverArtUrl] = useState("");
   const [visualizerLevels, setVisualizerLevels] = useState<number[]>(() => Array(24).fill(10));
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -145,11 +144,15 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
 
     if (!isSameBeat) {
       setCurrentBeat(nextBeat);
-      if (!nextBeat.mp3Url || isSupabasePublicObjectUrl(nextBeat.mp3Url)) {
+      console.log("[AudioPlayer] Raw beat URL:", nextBeat.mp3Url);
+      const signedPlaybackUrl = await getSignedUrlFromApi(nextBeat.mp3Url);
+      console.log("[AudioPlayer] Resolved signed URL:", signedPlaybackUrl);
+      if (!signedPlaybackUrl) {
         setIsPlaying(false);
         return;
       }
-      audio.src = nextBeat.mp3Url;
+      console.log("[AudioPlayer] Setting audio element src:", signedPlaybackUrl);
+      audio.src = signedPlaybackUrl;
       audio.currentTime = 0;
       setCurrentTime(0);
     }
@@ -281,6 +284,27 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
   }, [currentBeat, hasNext, hasPrevious, playNext, playPrevious, togglePlayPause]);
 
   useEffect(() => {
+    let active = true;
+    if (!currentBeat?.coverArtUrl) {
+      setResolvedCoverArtUrl("");
+      return () => {
+        active = false;
+      };
+    }
+
+    void (async () => {
+      const signedCoverUrl = await getSignedUrlFromApi(currentBeat.coverArtUrl);
+      if (active) {
+        setResolvedCoverArtUrl(signedCoverUrl);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [currentBeat?.coverArtUrl]);
+
+  useEffect(() => {
     return () => {
       stopVisualizer();
       if (audioContextRef.current) {
@@ -360,7 +384,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
           <div className="px-3 py-2.5 sm:px-4 sm:py-3">
             <div className="mx-auto flex w-full max-w-6xl items-center gap-2 sm:gap-3">
               <img
-                src={currentBeat.coverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
+                src={resolvedCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=300&q=80"}
                 alt={currentBeat.title}
                 className="h-9 w-9 rounded-md object-cover sm:h-11 sm:w-11"
               />

@@ -20,6 +20,7 @@ type AdminBeat = {
   bpm: number;
   tags: string[];
   featured: boolean;
+  cover_art_url: string | null;
 };
 type AdminProduction = {
   id: string;
@@ -103,6 +104,10 @@ export default function AdminUploadPage() {
     featured: false
   });
   const [editStatus, setEditStatus] = useState<Status>(initialStatus);
+  const [editCoverArtFile, setEditCoverArtFile] = useState<File | null>(null);
+  const [editCoverArtPreview, setEditCoverArtPreview] = useState("");
+  const [editCoverArtPath, setEditCoverArtPath] = useState("");
+  const [editCoverInputKey, setEditCoverInputKey] = useState(0);
 
   const expectedPassword = useMemo(() => process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD ?? "justron-admin", []);
 
@@ -193,6 +198,26 @@ export default function AdminUploadPage() {
     void loadBeats();
     void loadProductions();
   }, [isUnlocked]);
+
+  useEffect(() => {
+    if (!editCoverArtPreview.startsWith("blob:")) return;
+    return () => {
+      URL.revokeObjectURL(editCoverArtPreview);
+    };
+  }, [editCoverArtPreview]);
+
+  const resolveSignedCoverPreview = async (path: string) => {
+    const trimmed = path.trim();
+    if (!trimmed) return "";
+    const response = await fetch("/api/signed-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: trimmed })
+    });
+    if (!response.ok) return "";
+    const result = (await response.json()) as { signedUrl?: string };
+    return String(result.signedUrl ?? "").trim();
+  };
 
   const uploadToBeatsBucket = async (file: File, folder: string) => {
     if (!supabase) throw new Error("Supabase client is not configured.");
@@ -462,6 +487,16 @@ export default function AdminUploadPage() {
       tags: beat.tags.join(", "),
       featured: beat.featured
     });
+    const currentCoverPath = String(beat.cover_art_url ?? "").trim();
+    setEditCoverArtFile(null);
+    setEditCoverArtPath(currentCoverPath);
+    setEditCoverInputKey((prev) => prev + 1);
+    setEditCoverArtPreview("");
+    if (currentCoverPath) {
+      void resolveSignedCoverPreview(currentCoverPath).then((url) => {
+        setEditCoverArtPreview(url);
+      });
+    }
   };
 
   const saveEdit = async (event: FormEvent<HTMLFormElement>) => {
@@ -471,6 +506,12 @@ export default function AdminUploadPage() {
     setIsSavingEdit(true);
     setEditStatus(initialStatus);
     try {
+      let nextCoverPath = editCoverArtPath.trim();
+      if (editCoverArtFile) {
+        const folder = `edits/${editingBeatId}-${Date.now()}`;
+        nextCoverPath = await uploadToBeatsBucket(editCoverArtFile, folder);
+      }
+
       const response = await fetch("/api/admin/beats", {
         method: "PATCH",
         headers: {
@@ -487,7 +528,8 @@ export default function AdminUploadPage() {
             .split(",")
             .map((tag) => tag.trim())
             .filter(Boolean),
-          featured: editForm.featured
+          featured: editForm.featured,
+          coverArtPath: nextCoverPath || null
         })
       });
 
@@ -500,6 +542,10 @@ export default function AdminUploadPage() {
 
       setEditStatus({ type: "success", message: "Beat updated successfully." });
       setEditingBeatId(null);
+      setEditCoverArtFile(null);
+      setEditCoverArtPreview("");
+      setEditCoverArtPath("");
+      setEditCoverInputKey((prev) => prev + 1);
       await loadBeats();
       setIsSavingEdit(false);
     } catch (error) {
@@ -819,6 +865,33 @@ export default function AdminUploadPage() {
                       />
                       Featured on homepage carousel
                     </label>
+                    <div className="grid gap-2">
+                      <p className="text-xs text-zinc-400">Cover art</p>
+                      {editCoverArtPreview ? (
+                        <img src={editCoverArtPreview} alt="Cover preview" className="h-24 w-24 rounded-lg object-cover" />
+                      ) : (
+                        <p className="text-xs text-zinc-500">No cover image found.</p>
+                      )}
+                      <label className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300">
+                        Replace cover image
+                        <input
+                          key={`edit-cover-${editCoverInputKey}`}
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            setEditCoverArtFile(file);
+                            if (!file) {
+                              void resolveSignedCoverPreview(editCoverArtPath).then((url) => setEditCoverArtPreview(url));
+                              return;
+                            }
+                            const previewUrl = URL.createObjectURL(file);
+                            setEditCoverArtPreview(previewUrl);
+                          }}
+                          className="mt-2 block w-full text-xs text-zinc-400"
+                        />
+                      </label>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="submit"
@@ -829,7 +902,13 @@ export default function AdminUploadPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditingBeatId(null)}
+                        onClick={() => {
+                          setEditingBeatId(null);
+                          setEditCoverArtFile(null);
+                          setEditCoverArtPreview("");
+                          setEditCoverArtPath("");
+                          setEditCoverInputKey((prev) => prev + 1);
+                        }}
                         className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition hover:border-zinc-500"
                       >
                         Cancel

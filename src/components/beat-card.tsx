@@ -4,7 +4,7 @@ import { FormEvent, MouseEvent, useState } from "react";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { Beat } from "@/components/types";
 import { useRouter } from "next/navigation";
-import { isSupabasePublicObjectUrl } from "@/lib/storage";
+import { useSignedStorageUrl } from "@/components/use-signed-storage-url";
 
 type BeatCardProps = {
   beat: Beat;
@@ -38,8 +38,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
   const [checkoutError, setCheckoutError] = useState("");
   const [showCopied, setShowCopied] = useState(false);
   const [showLicenseTerms, setShowLicenseTerms] = useState(false);
-  const safeCoverArtUrl = isSupabasePublicObjectUrl(beat.coverArtUrl) ? "" : beat.coverArtUrl;
-  const safeMp3Url = isSupabasePublicObjectUrl(beat.mp3Url) ? "" : beat.mp3Url;
+  const signedCoverArtUrl = useSignedStorageUrl(beat.coverArtUrl);
 
   const submitOffer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -148,7 +147,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
 
       <div className="mb-4 flex items-start gap-4">
         <img
-          src={safeCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=500&q=80"}
+          src={signedCoverArtUrl || "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=500&q=80"}
           alt={beat.title}
           className="h-20 w-20 rounded-xl object-cover"
         />
@@ -165,10 +164,10 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions }: BeatCardPr
       </div>
 
       <CustomAudioPlayer
-        src={safeMp3Url}
+        src={beat.mp3Url}
         debugLabel={beat.title}
         trackId={beat.id}
-        coverArtUrl={safeCoverArtUrl}
+        coverArtUrl={signedCoverArtUrl}
         slug={beat.slug}
       />
 
