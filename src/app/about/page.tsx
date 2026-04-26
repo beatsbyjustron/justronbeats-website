@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "About | Justron Beats",
-  description: "Learn about Justron, his production style, and major placements across the underground scene."
+  description:
+    "Welcome to the official website of Justron — a producer from Connecticut with placements on artists like Nettspend, Glokk40Spazz, Slimesito, Hardrock, Backend, Brennan Jones, and Lazer Dim 700. On this website you will find Justron's official beats, drum kits, and samples available for lease and exclusive licensing."
 };
 
 export default function AboutPage() {
