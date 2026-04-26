@@ -10,15 +10,24 @@ body {
 
 @keyframes ticker-scroll {
   0% {
-    transform: translateX(0%);
+    transform: translate3d(0, 0, 0);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
+}
+
+.artist-ticker-container {
+  -webkit-overflow-scrolling: touch;
+  perspective: 1000px;
 }
 
 .artist-ticker-track {
   animation: ticker-scroll 24s linear infinite;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .delay-2000 {
