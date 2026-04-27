@@ -7,51 +7,32 @@ export const metadata: Metadata = {
 };
 
 export default function AboutPage() {
+  const socialLinks = [
+    { label: "Instagram", href: "https://www.instagram.com/justronbeats" },
+    { label: "TikTok", href: "https://www.tiktok.com/@justronbeats" },
+    { label: "SoundCloud", href: "https://soundcloud.com/justronbeats" },
+    { label: "YouTube", href: "https://www.youtube.com/@justron" }
+  ];
+
   return (
     <main className="max-w-2xl space-y-6">
       <h1 className="text-3xl font-semibold text-zinc-100">About</h1>
       <div className="space-y-4 leading-relaxed text-zinc-300">
-        <p>I am Justron. Thats it.</p>
+        <p>I am Justron.</p>
       </div>
-      <p className="text-zinc-400">
-        Follow the latest cookups and behind-the-scenes content on{" "}
-        <a
-          href="https://www.instagram.com/justronbeats"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-zinc-100 underline"
-        >
-          Instagram
-        </a>
-        ,{" "}
-        <a
-          href="https://www.tiktok.com/@justronbeats"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-zinc-100 underline"
-        >
-          TikTok
-        </a>
-        ,{" "}
-        <a
-          href="https://soundcloud.com/justronbeats"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-zinc-100 underline"
-        >
-          SoundCloud
-        </a>
-        , and{" "}
-        <a
-          href="https://www.youtube.com/@justron"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-zinc-100 underline"
-        >
-          YouTube
-        </a>
-        .
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {socialLinks.map((social) => (
+          <a
+            key={social.href}
+            href={social.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-zinc-100"
+          >
+            {social.label}
+          </a>
+        ))}
+      </div>
     </main>
   );
 }
