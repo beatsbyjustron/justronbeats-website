@@ -998,7 +998,7 @@ export default function AdminUploadPage() {
 
       {activeTab === "beats" && (
         <>
-      <form onSubmit={submitBeat} className="grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+      <form onSubmit={submitBeat} autoComplete="off" className="grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <input
           name="title"
           placeholder="Beat title"
@@ -1033,6 +1033,7 @@ export default function AdminUploadPage() {
         </div>
         <input
           name="tags"
+          autoComplete="off"
           placeholder="Tags (comma separated, e.g. lil uzi vert, osamason, drill)"
           value={uploadForm.tags}
           onChange={(event) => setUploadForm((prev) => ({ ...prev, tags: event.target.value }))}
