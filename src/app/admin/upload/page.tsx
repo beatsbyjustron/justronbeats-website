@@ -2,7 +2,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Status = {
   type: "idle" | "error" | "success";
@@ -93,6 +93,136 @@ function parseTagsInput(value: string) {
     .filter(Boolean);
 }
 
+function formatFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value >= 100 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function normalizeMonoChannel(audioBuffer: AudioBuffer) {
+  const channelCount = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length;
+  if (channelCount <= 1) {
+    return audioBuffer.getChannelData(0).slice();
+  }
+  const mono = new Float32Array(length);
+  for (let channel = 0; channel < channelCount; channel += 1) {
+    const data = audioBuffer.getChannelData(channel);
+    for (let i = 0; i < length; i += 1) {
+      mono[i] += data[i] / channelCount;
+    }
+  }
+  return mono;
+}
+
+function detectBpmFromSignal(signal: Float32Array, sampleRate: number) {
+  const hop = 512;
+  const frame = 1024;
+  const envelopeLength = Math.max(1, Math.floor((signal.length - frame) / hop));
+  const envelope = new Float32Array(envelopeLength);
+
+  for (let i = 0; i < envelopeLength; i += 1) {
+    const start = i * hop;
+    let energy = 0;
+    for (let j = 0; j < frame; j += 1) {
+      const sample = signal[start + j] ?? 0;
+      energy += sample * sample;
+    }
+    envelope[i] = Math.sqrt(energy / frame);
+  }
+
+  for (let i = envelope.length - 1; i > 0; i -= 1) {
+    envelope[i] = Math.max(0, envelope[i] - envelope[i - 1]);
+  }
+  envelope[0] = 0;
+
+  const envelopeRate = sampleRate / hop;
+  const minLag = Math.floor((60 * envelopeRate) / 200);
+  const maxLag = Math.floor((60 * envelopeRate) / 70);
+  let bestLag = 0;
+  let bestScore = 0;
+
+  for (let lag = minLag; lag <= maxLag; lag += 1) {
+    let score = 0;
+    for (let i = lag; i < envelope.length; i += 1) {
+      score += envelope[i] * envelope[i - lag];
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestLag = lag;
+    }
+  }
+
+  if (!bestLag) return null;
+  const bpm = Math.round((60 * envelopeRate) / bestLag);
+  if (!Number.isFinite(bpm) || bpm < 60 || bpm > 210) return null;
+  return bpm;
+}
+
+function detectKeyFromSignal(signal: Float32Array, sampleRate: number) {
+  const fftSize = 4096;
+  const hop = 2048;
+  const chroma = new Float32Array(12);
+  const twoPi = Math.PI * 2;
+
+  for (let start = 0; start + fftSize < signal.length; start += hop) {
+    for (let bin = 1; bin < fftSize / 2; bin += 1) {
+      const freq = (bin * sampleRate) / fftSize;
+      if (freq < 40 || freq > 5000) continue;
+      let real = 0;
+      let imag = 0;
+      for (let n = 0; n < fftSize; n += 1) {
+        const window = 0.5 * (1 - Math.cos((twoPi * n) / (fftSize - 1)));
+        const sample = (signal[start + n] ?? 0) * window;
+        const phase = (twoPi * bin * n) / fftSize;
+        real += sample * Math.cos(phase);
+        imag -= sample * Math.sin(phase);
+      }
+      const magnitude = Math.sqrt(real * real + imag * imag);
+      if (!Number.isFinite(magnitude) || magnitude <= 0) continue;
+      const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+      const pitchClass = ((midi % 12) + 12) % 12;
+      chroma[pitchClass] += magnitude;
+    }
+  }
+
+  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const majorProfile = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+  const minorProfile = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+
+  let bestKey = "";
+  let bestScore = -Infinity;
+
+  const scoreProfile = (profile: number[], offset: number) => {
+    let score = 0;
+    for (let i = 0; i < 12; i += 1) {
+      score += chroma[(i + offset) % 12] * profile[i];
+    }
+    return score;
+  };
+
+  for (let offset = 0; offset < 12; offset += 1) {
+    const majorScore = scoreProfile(majorProfile, offset);
+    if (majorScore > bestScore) {
+      bestScore = majorScore;
+      bestKey = `${noteNames[offset]} Major`;
+    }
+    const minorScore = scoreProfile(minorProfile, offset);
+    if (minorScore > bestScore) {
+      bestScore = minorScore;
+      bestKey = `${noteNames[offset]} Minor`;
+    }
+  }
+
+  return bestKey || null;
+}
+
 export default function AdminUploadPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits" | "sales">("beats");
@@ -106,6 +236,10 @@ export default function AdminUploadPage() {
   const [mp3File, setMp3File] = useState<File | null>(null);
   const [wavFile, setWavFile] = useState<File | null>(null);
   const [stemsFile, setStemsFile] = useState<File | null>(null);
+  const [audioDropActive, setAudioDropActive] = useState(false);
+  const [selectedAudioInfo, setSelectedAudioInfo] = useState<{ name: string; size: number } | null>(null);
+  const [isDetectingAudioMeta, setIsDetectingAudioMeta] = useState(false);
+  const [audioMetaError, setAudioMetaError] = useState("");
   const [fileInputKey, setFileInputKey] = useState(0);
   const [productionFileInputKey, setProductionFileInputKey] = useState(0);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>(initialUploadProgress);
@@ -163,6 +297,8 @@ export default function AdminUploadPage() {
   const [editCoverArtPreview, setEditCoverArtPreview] = useState("");
   const [editCoverArtPath, setEditCoverArtPath] = useState("");
   const [editCoverInputKey, setEditCoverInputKey] = useState(0);
+  const audioDropInputRef = useRef<HTMLInputElement | null>(null);
+  const analysisJobRef = useRef(0);
   const [adminBeatQuery, setAdminBeatQuery] = useState("");
   const [adminBeatBpmMin, setAdminBeatBpmMin] = useState("");
   const [adminBeatBpmMax, setAdminBeatBpmMax] = useState("");
@@ -450,14 +586,67 @@ export default function AdminUploadPage() {
     }
   };
 
+  const analyzeAudioFile = async (file: File) => {
+    const analysisId = analysisJobRef.current + 1;
+    analysisJobRef.current = analysisId;
+    setIsDetectingAudioMeta(true);
+    setAudioMetaError("");
+    try {
+      const buffer = await file.arrayBuffer();
+      const audioContext = new AudioContext();
+      const decoded = await audioContext.decodeAudioData(buffer.slice(0));
+      const mono = normalizeMonoChannel(decoded);
+      const sampleRate = decoded.sampleRate;
+      const bpm = detectBpmFromSignal(mono, sampleRate);
+      const key = detectKeyFromSignal(mono, sampleRate);
+      await audioContext.close();
+
+      if (analysisJobRef.current !== analysisId) return;
+
+      setUploadForm((prev) => ({
+        ...prev,
+        bpm: bpm ? String(bpm) : prev.bpm,
+        key: key ?? prev.key
+      }));
+
+      if (!bpm && !key) {
+        setAudioMetaError("Could not detect BPM/key for this file.");
+      }
+    } catch {
+      if (analysisJobRef.current !== analysisId) return;
+      setAudioMetaError("Could not detect BPM/key for this file.");
+    } finally {
+      if (analysisJobRef.current === analysisId) {
+        setIsDetectingAudioMeta(false);
+      }
+    }
+  };
+
+  const acceptAndProcessAudioFile = (file: File) => {
+    const lowerName = file.name.toLowerCase();
+    const isMp3 = lowerName.endsWith(".mp3") || file.type === "audio/mpeg";
+    const isWav = lowerName.endsWith(".wav") || file.type === "audio/wav" || file.type === "audio/x-wav";
+    if (!isMp3 && !isWav) {
+      setAudioMetaError("Only MP3 and WAV files are supported.");
+      return;
+    }
+    if (isMp3) {
+      setMp3File(file);
+    } else {
+      setWavFile(file);
+    }
+    setSelectedAudioInfo({ name: file.name, size: file.size });
+    void analyzeAudioFile(file);
+  };
+
   const submitBeat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setStatus(initialStatus);
     setUploadProgress(initialUploadProgress);
 
-    if (!uploadForm.title.trim() || !coverArtFile || !mp3File) {
-      setStatus({ type: "error", message: "Title, cover art, and MP3 are required." });
+    if (!uploadForm.title.trim() || !coverArtFile || (!mp3File && !wavFile)) {
+      setStatus({ type: "error", message: "Title, cover art, and at least one audio file (MP3 or WAV) are required." });
       setIsSubmitting(false);
       return;
     }
@@ -473,13 +662,14 @@ export default function AdminUploadPage() {
 
       setUploadProgress({
         coverArt: "queued",
-        mp3: "queued",
+        mp3: mp3File || wavFile ? "queued" : "skipped",
         wav: wavFile ? "queued" : "skipped",
         stems: stemsFile ? "queued" : "skipped"
       });
 
       const coverArtUrl = await uploadWithProgress("coverArt", coverArtFile, folder);
-      const mp3Url = await uploadWithProgress("mp3", mp3File, folder);
+      const primaryAudioFile = mp3File ?? wavFile;
+      const mp3Url = primaryAudioFile ? await uploadWithProgress("mp3", primaryAudioFile, folder) : "";
       const wavUrl = wavFile ? await uploadWithProgress("wav", wavFile, folder) : "";
       const stemsUrl = stemsFile ? await uploadWithProgress("stems", stemsFile, folder) : "";
 
@@ -513,6 +703,9 @@ export default function AdminUploadPage() {
       setMp3File(null);
       setWavFile(null);
       setStemsFile(null);
+      setSelectedAudioInfo(null);
+      setAudioMetaError("");
+      setIsDetectingAudioMeta(false);
       setFileInputKey((prev) => prev + 1);
       setUploadProgress(initialUploadProgress);
       setStatus({ type: "success", message: "Successfully Uploaded to the Store" });
@@ -1048,22 +1241,34 @@ export default function AdminUploadPage() {
           className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
         />
         <div className="grid gap-3 sm:grid-cols-2">
-          <input
-            name="key"
-            placeholder="Key (optional)"
-            value={uploadForm.key}
-            onChange={(event) => setUploadForm((prev) => ({ ...prev, key: event.target.value }))}
-            className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
-          />
-          <input
-            name="bpm"
-            type="number"
-            placeholder="BPM (optional)"
-            value={uploadForm.bpm}
-            onChange={(event) => setUploadForm((prev) => ({ ...prev, bpm: event.target.value }))}
-            className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
-          />
+          <div className="relative">
+            <input
+              name="key"
+              placeholder="Key (optional)"
+              value={uploadForm.key}
+              onChange={(event) => setUploadForm((prev) => ({ ...prev, key: event.target.value }))}
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 pr-10 text-zinc-100"
+            />
+            {isDetectingAudioMeta && (
+              <span className="absolute right-3 top-1/2 inline-block size-4 -translate-y-1/2 animate-spin rounded-full border-2 border-zinc-600 border-t-emerald-300" />
+            )}
+          </div>
+          <div className="relative">
+            <input
+              name="bpm"
+              type="number"
+              placeholder="BPM (optional)"
+              value={uploadForm.bpm}
+              onChange={(event) => setUploadForm((prev) => ({ ...prev, bpm: event.target.value }))}
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 pr-10 text-zinc-100"
+            />
+            {isDetectingAudioMeta && (
+              <span className="absolute right-3 top-1/2 inline-block size-4 -translate-y-1/2 animate-spin rounded-full border-2 border-zinc-600 border-t-emerald-300" />
+            )}
+          </div>
         </div>
+        {isDetectingAudioMeta && <p className="text-xs text-zinc-400">Detecting BPM and key...</p>}
+        {!!audioMetaError && <p className="text-xs text-amber-400">{audioMetaError}</p>}
         <input
           name="tags"
           autoComplete="off"
@@ -1098,18 +1303,58 @@ export default function AdminUploadPage() {
               className="mt-2 block w-full text-xs text-zinc-400"
             />
           </label>
-          <label className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-300">
-            MP3 file
+          <div
+            role="button"
+            tabIndex={0}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setAudioDropActive(true);
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              setAudioDropActive(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setAudioDropActive(false);
+              const file = event.dataTransfer.files?.[0];
+              if (file) {
+                acceptAndProcessAudioFile(file);
+              }
+            }}
+            onClick={() => audioDropInputRef.current?.click()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                audioDropInputRef.current?.click();
+              }
+            }}
+            className={`rounded-xl border border-dashed bg-zinc-950 px-4 py-3 text-sm text-zinc-300 transition sm:col-span-2 ${
+              audioDropActive ? "border-emerald-400/70 bg-zinc-900" : "border-zinc-700 hover:border-zinc-500"
+            }`}
+          >
+            <p>Drag &amp; drop your beat here or click to browse</p>
+            <p className="mt-1 text-xs text-zinc-500">MP3 and WAV only</p>
+            {selectedAudioInfo && (
+              <p className="mt-2 text-xs text-zinc-300">
+                Selected: {selectedAudioInfo.name} ({formatFileSize(selectedAudioInfo.size)})
+              </p>
+            )}
             <input
-              key={`mp3-${fileInputKey}`}
-              name="mp3File"
+              ref={audioDropInputRef}
+              key={`audio-drop-${fileInputKey}`}
+              name="audioDropFile"
               type="file"
-              accept=".mp3,audio/mpeg"
-              required
-              onChange={(event) => setMp3File(event.target.files?.[0] ?? null)}
-              className="mt-2 block w-full text-xs text-zinc-400"
+              accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (file) {
+                  acceptAndProcessAudioFile(file);
+                }
+              }}
+              className="hidden"
             />
-          </label>
+          </div>
           <label className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-300">
             WAV file
             <input
@@ -1117,7 +1362,14 @@ export default function AdminUploadPage() {
               name="wavFile"
               type="file"
               accept=".wav,audio/wav"
-              onChange={(event) => setWavFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (!file) {
+                  setWavFile(null);
+                  return;
+                }
+                acceptAndProcessAudioFile(file);
+              }}
               className="mt-2 block w-full text-xs text-zinc-400"
             />
           </label>
