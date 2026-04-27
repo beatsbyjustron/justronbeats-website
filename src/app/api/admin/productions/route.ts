@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { Database } from "@/types/database";
+import { parseStorageReference } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -114,6 +115,7 @@ export async function PATCH(request: Request) {
       id?: string;
       title?: string;
       artist?: string;
+      coverUrl?: string;
       spotifyUrl?: string;
       appleUrl?: string;
       youtubeUrl?: string;
@@ -131,6 +133,18 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Song title and artist name are required." }, { status: 400 });
     }
 
+    const { data: existingProduction, error: existingProductionError } = await supabase
+      .from("productions")
+      .select("cover_url")
+      .eq("id", id)
+      .single();
+    if (existingProductionError) {
+      return NextResponse.json({ error: existingProductionError.message }, { status: 500 });
+    }
+
+    const nextCoverUrlRaw = body.coverUrl;
+    const nextCoverUrl = typeof nextCoverUrlRaw === "string" ? nextCoverUrlRaw.trim() || undefined : undefined;
+
     const maybeYear = Number(body.year);
     const year = Number.isFinite(maybeYear) && maybeYear > 0 ? Math.floor(maybeYear) : null;
 
@@ -139,6 +153,7 @@ export async function PATCH(request: Request) {
       .update({
         title,
         artist,
+        ...(nextCoverUrl !== undefined ? { cover_url: nextCoverUrl } : {}),
         spotify_url: String(body.spotifyUrl ?? "").trim() || null,
         apple_url: String(body.appleUrl ?? "").trim() || null,
         youtube_url: String(body.youtubeUrl ?? "").trim() || null,
@@ -149,6 +164,14 @@ export async function PATCH(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const previousCoverUrl = String(existingProduction?.cover_url ?? "").trim();
+    if (nextCoverUrl && previousCoverUrl && previousCoverUrl !== nextCoverUrl) {
+      const previousRef = parseStorageReference(previousCoverUrl);
+      if (previousRef) {
+        await supabase.storage.from(previousRef.bucket).remove([previousRef.path]);
+      }
     }
 
     revalidatePath("/productions");

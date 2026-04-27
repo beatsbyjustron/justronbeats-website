@@ -117,6 +117,10 @@ export default function AdminUploadPage() {
   const [productionForm, setProductionForm] = useState(initialProductionForm);
   const [productionEditForm, setProductionEditForm] = useState(initialProductionForm);
   const [productionCoverArtFile, setProductionCoverArtFile] = useState<File | null>(null);
+  const [productionEditCoverArtFile, setProductionEditCoverArtFile] = useState<File | null>(null);
+  const [productionEditCoverPreview, setProductionEditCoverPreview] = useState("");
+  const [productionEditCoverPath, setProductionEditCoverPath] = useState("");
+  const [productionEditInputKey, setProductionEditInputKey] = useState(0);
   const [drumKitImageFile, setDrumKitImageFile] = useState<File | null>(null);
   const [drumKitZipFile, setDrumKitZipFile] = useState<File | null>(null);
   const [drumKitFileInputKey, setDrumKitFileInputKey] = useState(0);
@@ -270,6 +274,13 @@ export default function AdminUploadPage() {
       URL.revokeObjectURL(editCoverArtPreview);
     };
   }, [editCoverArtPreview]);
+
+  useEffect(() => {
+    if (!productionEditCoverPreview.startsWith("blob:")) return;
+    return () => {
+      URL.revokeObjectURL(productionEditCoverPreview);
+    };
+  }, [productionEditCoverPreview]);
 
   const resolveSignedCoverPreview = async (path: string) => {
     const trimmed = path.trim();
@@ -609,6 +620,14 @@ export default function AdminUploadPage() {
       soundcloudUrl: production.soundcloud_url ?? "",
       year: production.year ? String(production.year) : ""
     });
+    const currentCoverPath = String(production.cover_url ?? "").trim();
+    setProductionEditCoverArtFile(null);
+    setProductionEditCoverPath(currentCoverPath);
+    setProductionEditInputKey((prev) => prev + 1);
+    setProductionEditCoverPreview("");
+    if (currentCoverPath) {
+      void resolveSignedCoverPreview(currentCoverPath).then((url) => setProductionEditCoverPreview(url));
+    }
   };
 
   const saveProductionEdit = async (event: FormEvent<HTMLFormElement>) => {
@@ -618,6 +637,12 @@ export default function AdminUploadPage() {
     setIsSavingProductionEdit(true);
     setProductionStatus(initialStatus);
     try {
+      let nextCoverPath = productionEditCoverPath.trim();
+      if (productionEditCoverArtFile) {
+        const folder = `productions/edits/${editingProductionId}-${Date.now()}`;
+        nextCoverPath = await uploadToBeatsBucket(productionEditCoverArtFile, folder);
+      }
+
       const response = await fetch("/api/admin/productions", {
         method: "PATCH",
         headers: {
@@ -632,7 +657,8 @@ export default function AdminUploadPage() {
           appleUrl: productionEditForm.appleUrl.trim(),
           youtubeUrl: productionEditForm.youtubeUrl.trim(),
           soundcloudUrl: productionEditForm.soundcloudUrl.trim(),
-          year: productionEditForm.year ? Number(productionEditForm.year) : null
+          year: productionEditForm.year ? Number(productionEditForm.year) : null,
+          coverUrl: nextCoverPath || undefined
         })
       });
 
@@ -645,6 +671,10 @@ export default function AdminUploadPage() {
 
       setProductionStatus({ type: "success", message: "Production updated successfully." });
       setEditingProductionId(null);
+      setProductionEditCoverArtFile(null);
+      setProductionEditCoverPreview("");
+      setProductionEditCoverPath("");
+      setProductionEditInputKey((prev) => prev + 1);
       await loadProductions();
       setIsSavingProductionEdit(false);
     } catch (error) {
@@ -1324,6 +1354,32 @@ export default function AdminUploadPage() {
                       placeholder="Year"
                       className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
                     />
+                    <div className="grid gap-2">
+                      <p className="text-xs text-zinc-400">Cover art</p>
+                      {productionEditCoverPreview ? (
+                        <img src={productionEditCoverPreview} alt="Production cover preview" className="h-24 w-24 rounded-lg object-cover" />
+                      ) : (
+                        <p className="text-xs text-zinc-500">No cover image found.</p>
+                      )}
+                      <label className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300">
+                        Replace cover image
+                        <input
+                          key={`production-edit-cover-${productionEditInputKey}`}
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            setProductionEditCoverArtFile(file);
+                            if (!file) {
+                              void resolveSignedCoverPreview(productionEditCoverPath).then((url) => setProductionEditCoverPreview(url));
+                              return;
+                            }
+                            setProductionEditCoverPreview(URL.createObjectURL(file));
+                          }}
+                          className="mt-2 block w-full text-xs text-zinc-400"
+                        />
+                      </label>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="submit"
@@ -1334,7 +1390,13 @@ export default function AdminUploadPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditingProductionId(null)}
+                        onClick={() => {
+                          setEditingProductionId(null);
+                          setProductionEditCoverArtFile(null);
+                          setProductionEditCoverPreview("");
+                          setProductionEditCoverPath("");
+                          setProductionEditInputKey((prev) => prev + 1);
+                        }}
                         className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-300 transition hover:border-zinc-500"
                       >
                         Cancel
