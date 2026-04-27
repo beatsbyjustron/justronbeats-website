@@ -120,7 +120,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
   return (
     <article
       data-beat-id={beat.id}
-      className="relative cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 transition hover:border-zinc-700"
+      className="relative max-w-full min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 transition hover:border-zinc-700 sm:p-5"
       onClick={onCardClick}
     >
       <div className="absolute right-3 top-3">
@@ -146,15 +146,22 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
         )}
       </div>
 
-      <div className="mb-4 flex items-start gap-4">
+      <div className="mb-4 flex min-w-0 items-start gap-3 sm:gap-4">
         {signedCoverArtUrl ? (
-          <img src={signedCoverArtUrl} alt={beat.title} className="h-20 w-20 rounded-xl object-cover" />
+          <img
+            src={signedCoverArtUrl}
+            alt={beat.title}
+            className="h-16 w-16 shrink-0 rounded-xl object-cover sm:h-20 sm:w-20"
+          />
         ) : (
-          <div className="h-20 w-20 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900" aria-hidden="true" />
+          <div
+            className="h-16 w-16 shrink-0 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900 sm:h-20 sm:w-20"
+            aria-hidden="true"
+          />
         )}
-        <div>
-          <h3 className="text-lg font-semibold text-zinc-100">{beat.title}</h3>
-          <p className="text-sm text-zinc-400">{formatProducerLine(beat.producedBy)}</p>
+        <div className="min-w-0 flex-1 pr-10">
+          <h3 className="break-words text-base font-semibold leading-snug text-zinc-100 sm:text-lg">{beat.title}</h3>
+          <p className="break-words text-sm text-zinc-400">{formatProducerLine(beat.producedBy)}</p>
           <p className="text-xs text-zinc-500">
             {beat.bpm} BPM • {beat.key}
           </p>
@@ -186,7 +193,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
         slug={beat.slug}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={startLeaseCheckout}

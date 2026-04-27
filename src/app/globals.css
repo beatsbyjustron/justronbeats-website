@@ -4,6 +4,11 @@
   color-scheme: dark;
 }
 
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   @apply bg-zinc-950 text-zinc-100 antialiased;
 }

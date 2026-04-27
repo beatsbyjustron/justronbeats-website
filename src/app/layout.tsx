@@ -65,22 +65,25 @@ export default function RootLayout({
       <body className="relative isolate overflow-x-hidden">
         <BackgroundAmbience />
         <GlobalAudioPlayerProvider>
-          <div className="mx-auto min-h-screen w-full max-w-6xl px-6 py-8 pb-28">
-            <header className="mb-12 flex flex-wrap items-center justify-between gap-6 border-b border-zinc-800 pb-6">
-              <Link href="/" className="text-lg font-semibold tracking-wide text-zinc-100">
+          <div className="mx-auto min-h-screen w-full max-w-6xl min-w-0 px-4 pb-28 pt-8 sm:px-6">
+            <header className="mb-12 flex flex-col gap-6 border-b border-zinc-800 pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4">
+              <Link
+                href="/"
+                className="shrink-0 text-center text-lg font-semibold tracking-wide text-zinc-100 sm:text-left"
+              >
                 JUSTRONBEATS
               </Link>
-              <nav className="flex items-center gap-4 text-sm text-zinc-400">
+              <nav className="flex min-w-0 flex-[1_1_auto] flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs text-zinc-400 sm:justify-end sm:gap-x-4 sm:gap-y-2 sm:text-sm">
                 {navLinks.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="rounded-full px-3 py-1.5 transition hover:bg-zinc-900 hover:text-zinc-100"
+                    className="rounded-full px-2.5 py-1.5 transition hover:bg-zinc-900 hover:text-zinc-100 sm:px-3"
                   >
                     {item.label}
                   </Link>
                 ))}
-                <div className="ml-1 flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2 sm:ml-1">
                   <a
                     href="https://www.instagram.com/justronbeats"
                     target="_blank"
@@ -113,7 +116,7 @@ export default function RootLayout({
             </header>
             {children}
             <footer className="mt-16 border-t border-zinc-800 pt-6">
-              <div className="flex items-center justify-between text-xs text-zinc-500">
+              <div className="flex flex-col items-center justify-between gap-4 text-xs text-zinc-500 sm:flex-row">
                 <p>© {new Date().getFullYear()} Justron Beats</p>
                 <div className="flex items-center gap-3">
                   <a href="https://www.instagram.com/justronbeats" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300">

@@ -53,10 +53,12 @@ export function FeaturedCarousel({ productions }: FeaturedCarouselProps) {
   }
 
   return (
-    <section className="space-y-4">
-      <h2 className="text-xl font-semibold text-zinc-100">Featured Productions</h2>
+    <section className="w-full min-w-0 space-y-4">
+      <h2 className="text-center text-xl font-semibold text-zinc-100 sm:text-left">Featured Productions</h2>
 
-      <div className={`grid gap-4 sm:grid-cols-3 transition-opacity duration-500 ${fadeIn ? "opacity-100" : "opacity-0"}`}>
+      <div
+        className={`grid grid-cols-1 gap-4 transition-opacity duration-500 sm:grid-cols-2 lg:grid-cols-3 ${fadeIn ? "opacity-100" : "opacity-0"}`}
+      >
         {visible.map((item, index) => (
           <FeaturedCarouselCard key={`${item.id}-${startIndex}-${index}`} item={item} />
         ))}

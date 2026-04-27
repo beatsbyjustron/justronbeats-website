@@ -367,7 +367,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
       {children}
 
       {currentBeat && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-50 w-full min-w-0 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur">
           <div className="border-b border-zinc-800/70 px-3 py-1.5">
             <input
               type="range"
@@ -377,12 +377,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: React.ReactN
               value={currentTime}
               onChange={(event) => seekTo(Number(event.target.value))}
               aria-label="Playback progress"
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-zinc-200"
+              className="h-1.5 w-full min-w-0 cursor-pointer appearance-none rounded-full bg-zinc-800 accent-zinc-200"
             />
           </div>
 
           <div className="px-3 py-2.5 sm:px-4 sm:py-3">
-            <div className="mx-auto flex w-full max-w-6xl items-center gap-2 sm:gap-3">
+            <div className="mx-auto flex w-full min-w-0 max-w-6xl items-center gap-2 sm:gap-3">
               {resolvedCoverArtUrl ? (
                 <img src={resolvedCoverArtUrl} alt={currentBeat.title} className="h-9 w-9 rounded-md object-cover sm:h-11 sm:w-11" />
               ) : (

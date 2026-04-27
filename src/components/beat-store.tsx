@@ -105,9 +105,12 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
   };
 
   return (
-    <section className="space-y-4">
+    <section className="w-full min-w-0 space-y-4">
       <div className="space-y-2">
-        <label htmlFor="beat-search" className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+        <label
+          htmlFor="beat-search"
+          className="block text-center text-xs uppercase tracking-[0.2em] text-zinc-500 sm:text-left"
+        >
           Search Beats
         </label>
         <input
@@ -116,13 +119,13 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder="Search by beat name, artist, or tags..."
-          className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none ring-zinc-500 placeholder:text-zinc-500 focus:ring-2"
+          className="w-full min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none ring-zinc-500 placeholder:text-zinc-500 focus:ring-2"
         />
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
           <select
             value={selectedKey}
             onChange={(event) => setSelectedKey(event.target.value)}
-            className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+            className="min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
           >
             <option value="all">All keys</option>
             {keys.map((key) => (
@@ -136,14 +139,14 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
             value={bpmMin}
             onChange={(event) => setBpmMin(event.target.value)}
             placeholder="Min BPM"
-            className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+            className="min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
           />
           <input
             type="number"
             value={bpmMax}
             onChange={(event) => setBpmMax(event.target.value)}
             placeholder="Max BPM"
-            className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+            className="min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
           />
         </div>
       </div>

@@ -4,6 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import type { AnalyzeResponse } from "@/lib/audio-analysis-contract";
+
 type Status = {
   type: "idle" | "error" | "success";
   message: string;
@@ -105,124 +107,6 @@ function formatFileSize(bytes: number) {
   return `${value.toFixed(value >= 100 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-function normalizeMonoChannel(audioBuffer: AudioBuffer) {
-  const channelCount = audioBuffer.numberOfChannels;
-  const length = audioBuffer.length;
-  if (channelCount <= 1) {
-    return audioBuffer.getChannelData(0).slice();
-  }
-  const mono = new Float32Array(length);
-  for (let channel = 0; channel < channelCount; channel += 1) {
-    const data = audioBuffer.getChannelData(channel);
-    for (let i = 0; i < length; i += 1) {
-      mono[i] += data[i] / channelCount;
-    }
-  }
-  return mono;
-}
-
-function detectBpmFromSignal(signal: Float32Array, sampleRate: number) {
-  const hop = 512;
-  const frame = 1024;
-  const envelopeLength = Math.max(1, Math.floor((signal.length - frame) / hop));
-  const envelope = new Float32Array(envelopeLength);
-
-  for (let i = 0; i < envelopeLength; i += 1) {
-    const start = i * hop;
-    let energy = 0;
-    for (let j = 0; j < frame; j += 1) {
-      const sample = signal[start + j] ?? 0;
-      energy += sample * sample;
-    }
-    envelope[i] = Math.sqrt(energy / frame);
-  }
-
-  for (let i = envelope.length - 1; i > 0; i -= 1) {
-    envelope[i] = Math.max(0, envelope[i] - envelope[i - 1]);
-  }
-  envelope[0] = 0;
-
-  const envelopeRate = sampleRate / hop;
-  const minLag = Math.floor((60 * envelopeRate) / 200);
-  const maxLag = Math.floor((60 * envelopeRate) / 70);
-  let bestLag = 0;
-  let bestScore = 0;
-
-  for (let lag = minLag; lag <= maxLag; lag += 1) {
-    let score = 0;
-    for (let i = lag; i < envelope.length; i += 1) {
-      score += envelope[i] * envelope[i - lag];
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestLag = lag;
-    }
-  }
-
-  if (!bestLag) return null;
-  const bpm = Math.round((60 * envelopeRate) / bestLag);
-  if (!Number.isFinite(bpm) || bpm < 60 || bpm > 210) return null;
-  return bpm;
-}
-
-function detectKeyFromSignal(signal: Float32Array, sampleRate: number) {
-  const fftSize = 4096;
-  const hop = 2048;
-  const chroma = new Float32Array(12);
-  const twoPi = Math.PI * 2;
-
-  for (let start = 0; start + fftSize < signal.length; start += hop) {
-    for (let bin = 1; bin < fftSize / 2; bin += 1) {
-      const freq = (bin * sampleRate) / fftSize;
-      if (freq < 40 || freq > 5000) continue;
-      let real = 0;
-      let imag = 0;
-      for (let n = 0; n < fftSize; n += 1) {
-        const window = 0.5 * (1 - Math.cos((twoPi * n) / (fftSize - 1)));
-        const sample = (signal[start + n] ?? 0) * window;
-        const phase = (twoPi * bin * n) / fftSize;
-        real += sample * Math.cos(phase);
-        imag -= sample * Math.sin(phase);
-      }
-      const magnitude = Math.sqrt(real * real + imag * imag);
-      if (!Number.isFinite(magnitude) || magnitude <= 0) continue;
-      const midi = Math.round(69 + 12 * Math.log2(freq / 440));
-      const pitchClass = ((midi % 12) + 12) % 12;
-      chroma[pitchClass] += magnitude;
-    }
-  }
-
-  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  const majorProfile = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-  const minorProfile = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
-
-  let bestKey = "";
-  let bestScore = -Infinity;
-
-  const scoreProfile = (profile: number[], offset: number) => {
-    let score = 0;
-    for (let i = 0; i < 12; i += 1) {
-      score += chroma[(i + offset) % 12] * profile[i];
-    }
-    return score;
-  };
-
-  for (let offset = 0; offset < 12; offset += 1) {
-    const majorScore = scoreProfile(majorProfile, offset);
-    if (majorScore > bestScore) {
-      bestScore = majorScore;
-      bestKey = `${noteNames[offset]} Major`;
-    }
-    const minorScore = scoreProfile(minorProfile, offset);
-    if (minorScore > bestScore) {
-      bestScore = minorScore;
-      bestKey = `${noteNames[offset]} Minor`;
-    }
-  }
-
-  return bestKey || null;
-}
-
 export default function AdminUploadPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits" | "sales">("beats");
@@ -299,6 +183,11 @@ export default function AdminUploadPage() {
   const [editCoverInputKey, setEditCoverInputKey] = useState(0);
   const audioDropInputRef = useRef<HTMLInputElement | null>(null);
   const analysisJobRef = useRef(0);
+  const audioAnalysisWorkerRef = useRef<Worker | null>(null);
+  const pendingAnalysisRef = useRef<{
+    id: number;
+    finish: (data: AnalyzeResponse) => void;
+  } | null>(null);
   const [adminBeatQuery, setAdminBeatQuery] = useState("");
   const [adminBeatBpmMin, setAdminBeatBpmMin] = useState("");
   const [adminBeatBpmMax, setAdminBeatBpmMax] = useState("");
@@ -320,6 +209,25 @@ export default function AdminUploadPage() {
     }, 1800);
     return () => clearTimeout(timeout);
   }, [router, status.type]);
+
+  useEffect(() => {
+    const worker = new Worker(new URL("../../../workers/audio-analysis.worker.ts", import.meta.url), {
+      type: "module"
+    });
+    audioAnalysisWorkerRef.current = worker;
+    worker.onmessage = (event: MessageEvent<AnalyzeResponse>) => {
+      const data = event.data;
+      const pending = pendingAnalysisRef.current;
+      if (!pending || pending.id !== data.id) return;
+      pendingAnalysisRef.current = null;
+      pending.finish(data);
+    };
+    return () => {
+      pendingAnalysisRef.current = null;
+      worker.terminate();
+      audioAnalysisWorkerRef.current = null;
+    };
+  }, []);
 
   const loadBeats = async () => {
     setIsLoadingBeats(true);
@@ -591,35 +499,54 @@ export default function AdminUploadPage() {
     analysisJobRef.current = analysisId;
     setIsDetectingAudioMeta(true);
     setAudioMetaError("");
+
+    const worker = audioAnalysisWorkerRef.current;
+    if (!worker) {
+      setAudioMetaError("Analysis worker failed to initialize.");
+      setIsDetectingAudioMeta(false);
+      return;
+    }
+
+    let buffer: ArrayBuffer;
     try {
-      const buffer = await file.arrayBuffer();
-      const audioContext = new AudioContext();
-      const decoded = await audioContext.decodeAudioData(buffer.slice(0));
-      const mono = normalizeMonoChannel(decoded);
-      const sampleRate = decoded.sampleRate;
-      const bpm = detectBpmFromSignal(mono, sampleRate);
-      const key = detectKeyFromSignal(mono, sampleRate);
-      await audioContext.close();
-
-      if (analysisJobRef.current !== analysisId) return;
-
-      setUploadForm((prev) => ({
-        ...prev,
-        bpm: bpm ? String(bpm) : prev.bpm,
-        key: key ?? prev.key
-      }));
-
-      if (!bpm && !key) {
-        setAudioMetaError("Could not detect BPM/key for this file.");
-      }
+      buffer = await file.arrayBuffer();
     } catch {
-      if (analysisJobRef.current !== analysisId) return;
-      setAudioMetaError("Could not detect BPM/key for this file.");
-    } finally {
       if (analysisJobRef.current === analysisId) {
+        setAudioMetaError("Could not read this audio file.");
         setIsDetectingAudioMeta(false);
       }
+      return;
     }
+
+    if (analysisJobRef.current !== analysisId) {
+      setIsDetectingAudioMeta(false);
+      return;
+    }
+
+    pendingAnalysisRef.current = {
+      id: analysisId,
+      finish: (data) => {
+        if (analysisJobRef.current !== analysisId) return;
+
+        if (data.error) {
+          setAudioMetaError("Could not detect BPM/key for this file.");
+        } else {
+          setUploadForm((prev) => ({
+            ...prev,
+            bpm: data.bpm != null ? String(data.bpm) : prev.bpm,
+            key: data.key ?? prev.key
+          }));
+
+          if (data.bpm == null && data.key == null) {
+            setAudioMetaError("Could not detect BPM/key for this file.");
+          }
+        }
+
+        setIsDetectingAudioMeta(false);
+      }
+    };
+
+    worker.postMessage({ id: analysisId, buffer }, [buffer]);
   };
 
   const acceptAndProcessAudioFile = (file: File) => {
@@ -1226,7 +1153,8 @@ export default function AdminUploadPage() {
         <>
       <form onSubmit={submitBeat} autoComplete="off" className="grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <input
-          name="title"
+          name="jr-beat-upload-title"
+          autoComplete="off"
           placeholder="Beat title"
           required
           value={uploadForm.title}
@@ -1234,7 +1162,8 @@ export default function AdminUploadPage() {
           className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
         />
         <input
-          name="producerCredits"
+          name="jr-beat-upload-credits"
+          autoComplete="off"
           placeholder="Producer/collaborator credits"
           value={uploadForm.producerCredits}
           onChange={(event) => setUploadForm((prev) => ({ ...prev, producerCredits: event.target.value }))}
@@ -1243,7 +1172,8 @@ export default function AdminUploadPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="relative">
             <input
-              name="key"
+              name="jr-beat-musical-key"
+              autoComplete="off"
               placeholder="Key (optional)"
               value={uploadForm.key}
               onChange={(event) => setUploadForm((prev) => ({ ...prev, key: event.target.value }))}
@@ -1255,9 +1185,11 @@ export default function AdminUploadPage() {
           </div>
           <div className="relative">
             <input
-              name="bpm"
+              name="jr-beat-tempo-numeric"
+              autoComplete="off"
               type="number"
               placeholder="BPM (optional)"
+              inputMode="numeric"
               value={uploadForm.bpm}
               onChange={(event) => setUploadForm((prev) => ({ ...prev, bpm: event.target.value }))}
               className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 pr-10 text-zinc-100"
@@ -1466,14 +1398,20 @@ export default function AdminUploadPage() {
           </select>
           <div className="grid grid-cols-2 gap-2">
             <input
+              name="jr-admin-catalog-bpm-min"
+              autoComplete="off"
               type="number"
+              inputMode="numeric"
               value={adminBeatBpmMin}
               onChange={(event) => setAdminBeatBpmMin(event.target.value)}
               placeholder="Min BPM"
               className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
             />
             <input
+              name="jr-admin-catalog-bpm-max"
+              autoComplete="off"
               type="number"
+              inputMode="numeric"
               value={adminBeatBpmMax}
               onChange={(event) => setAdminBeatBpmMax(event.target.value)}
               placeholder="Max BPM"
@@ -1519,7 +1457,10 @@ export default function AdminUploadPage() {
                         className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
                       />
                       <input
+                        name="jr-beat-edit-tempo-numeric"
+                        autoComplete="off"
                         type="number"
+                        inputMode="numeric"
                         value={editForm.bpm}
                         onChange={(event) => setEditForm((prev) => ({ ...prev, bpm: event.target.value }))}
                         placeholder="BPM"

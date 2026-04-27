@@ -66,7 +66,7 @@ export function NewsletterCapture() {
   if (!visible) return null;
 
   return (
-    <aside className="fixed inset-x-4 bottom-4 z-50 mx-auto w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur">
+    <aside className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-medium text-zinc-100">Stay updated on new beats and drops - join the list</p>

@@ -13,8 +13,8 @@ export function ArtistTicker() {
   const items = [...artists, ...artists];
 
   return (
-    <section className="artist-ticker-container overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 py-4">
-      <div className="artist-ticker-track flex min-w-max items-center gap-8 px-6">
+    <section className="artist-ticker-container mx-auto w-full max-w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 py-4">
+      <div className="artist-ticker-track flex w-max min-w-max max-w-none items-center gap-6 px-4 sm:gap-8 sm:px-6">
         {items.map((artist, index) => (
           <article key={`${artist.name}-${index}`} className="min-w-[180px] text-white">
             <p className="text-sm font-medium">{artist.name}</p>

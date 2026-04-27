@@ -53,16 +53,16 @@ export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug 
   };
 
   return (
-    <div className="mb-5 space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-3">
-      <div className="flex items-center gap-3">
+    <div className="mb-5 max-w-full min-w-0 space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-3">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={togglePlay}
-          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-100 transition hover:border-zinc-500"
+          className="shrink-0 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-100 transition hover:border-zinc-500"
         >
           {isCurrentBeat && isPlaying ? "Pause" : "Play"}
         </button>
-        <div className="flex flex-1 items-end gap-1">
+        <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-hidden sm:gap-1">
           {bars.map((height, index) => (
             <span
               key={`${index}-${height}`}
@@ -77,8 +77,8 @@ export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug 
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className="w-10 text-xs text-zinc-500">{formatTime(progress)}</span>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="w-9 shrink-0 text-xs text-zinc-500 sm:w-10">{formatTime(progress)}</span>
         <input
           type="range"
           min={0}
@@ -86,9 +86,9 @@ export function CustomAudioPlayer({ src, debugLabel, trackId, coverArtUrl, slug 
           step={0.01}
           value={progress}
           onChange={(event) => onProgressChange(Number(event.target.value))}
-          className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-zinc-800 accent-zinc-200"
+          className="h-1 min-w-0 flex-1 cursor-pointer appearance-none rounded-lg bg-zinc-800 accent-zinc-200"
         />
-        <span className="w-10 text-right text-xs text-zinc-500">{formatTime(totalDuration)}</span>
+        <span className="w-9 shrink-0 text-right text-xs text-zinc-500 sm:w-10">{formatTime(totalDuration)}</span>
       </div>
     </div>
   );

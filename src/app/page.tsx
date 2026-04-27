@@ -17,15 +17,15 @@ export default async function HomePage() {
   const featuredProductions = mapFeaturedProductions(beats);
 
   return (
-    <main className="space-y-12">
-      <section className="max-w-3xl space-y-4">
+    <main className="w-full min-w-0 space-y-12">
+      <section className="mx-auto max-w-3xl space-y-4 text-center sm:text-left">
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Beat Store</p>
         <h1 className="text-4xl font-bold text-zinc-100 sm:text-5xl">Official Store for Justron Beats</h1>
         <p className="text-zinc-400">Browse beats. Own your sound.</p>
       </section>
 
-      <section className="space-y-3">
-        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Produced For</p>
+      <section className="w-full min-w-0 space-y-3">
+        <p className="text-center text-xs uppercase tracking-[0.2em] text-zinc-500 sm:text-left">Produced For</p>
         <ArtistTicker />
       </section>
 
