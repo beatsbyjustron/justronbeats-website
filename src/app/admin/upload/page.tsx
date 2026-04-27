@@ -41,6 +41,15 @@ type AdminDrumKit = {
   image_path: string | null;
   zip_path: string;
 };
+type AdminSaleRow = {
+  id: string;
+  buyerName: string;
+  buyerEmail: string;
+  itemName: string;
+  licenseType: string;
+  amountPaid: number;
+  purchasedAt: string;
+};
 
 const initialStatus: Status = { type: "idle", message: "" };
 const initialUploadProgress: UploadProgress = {
@@ -86,7 +95,7 @@ function parseTagsInput(value: string) {
 
 export default function AdminUploadPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits">("beats");
+  const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits" | "sales">("beats");
   const [gatePassword, setGatePassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,9 +112,12 @@ export default function AdminUploadPage() {
   const [beats, setBeats] = useState<AdminBeat[]>([]);
   const [productions, setProductions] = useState<AdminProduction[]>([]);
   const [drumKits, setDrumKits] = useState<AdminDrumKit[]>([]);
+  const [sales, setSales] = useState<AdminSaleRow[]>([]);
+  const [totalRevenue, setTotalRevenue] = useState(0);
   const [isLoadingBeats, setIsLoadingBeats] = useState(false);
   const [isLoadingProductions, setIsLoadingProductions] = useState(false);
   const [isLoadingDrumKits, setIsLoadingDrumKits] = useState(false);
+  const [isLoadingSales, setIsLoadingSales] = useState(false);
   const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deletingBeatId, setDeletingBeatId] = useState<string | null>(null);
@@ -126,6 +138,7 @@ export default function AdminUploadPage() {
   const [drumKitFileInputKey, setDrumKitFileInputKey] = useState(0);
   const [drumKitForm, setDrumKitForm] = useState(initialDrumKitForm);
   const [drumKitStatus, setDrumKitStatus] = useState<Status>(initialStatus);
+  const [salesStatus, setSalesStatus] = useState<Status>(initialStatus);
   const [isSubmittingDrumKit, setIsSubmittingDrumKit] = useState(false);
   const [editingDrumKitId, setEditingDrumKitId] = useState<string | null>(null);
   const [drumKitEditForm, setDrumKitEditForm] = useState(initialDrumKitForm);
@@ -250,6 +263,33 @@ export default function AdminUploadPage() {
     }
   };
 
+  const loadSales = async () => {
+    setIsLoadingSales(true);
+    setSalesStatus(initialStatus);
+    try {
+      const password = gatePassword || formPassword;
+      const response = await fetch("/api/admin/sales", {
+        method: "GET",
+        headers: {
+          "x-admin-password": password
+        }
+      });
+      const result = (await response.json()) as { error?: string; rows?: AdminSaleRow[]; totalRevenue?: number };
+      if (!response.ok) {
+        setSalesStatus({ type: "error", message: result.error ?? "Failed to fetch sales." });
+        setIsLoadingSales(false);
+        return;
+      }
+      setSales(result.rows ?? []);
+      setTotalRevenue(Number(result.totalRevenue ?? 0));
+      setIsLoadingSales(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to fetch sales.";
+      setSalesStatus({ type: "error", message });
+      setIsLoadingSales(false);
+    }
+  };
+
   const unlock = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (gatePassword === expectedPassword) {
@@ -266,7 +306,58 @@ export default function AdminUploadPage() {
     void loadBeats();
     void loadProductions();
     void loadDrumKits();
+    void loadSales();
   }, [isUnlocked]);
+
+  const formatUsd = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD"
+    }).format(value || 0);
+
+  const formatSaleDate = (value: string) => {
+    if (!value) return "";
+    return new Date(value).toLocaleString();
+  };
+
+  const exportSalesCsv = () => {
+    if (!sales.length) {
+      setSalesStatus({ type: "error", message: "No sales records to export." });
+      return;
+    }
+    const escapeCell = (value: string | number) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const lines = [
+      [
+        "Buyer Name",
+        "Buyer Email",
+        "Item Purchased",
+        "License",
+        "Amount Paid (USD)",
+        "Date of Purchase"
+      ].join(","),
+      ...sales.map((row) =>
+        [
+          escapeCell(row.buyerName || "N/A"),
+          escapeCell(row.buyerEmail || "N/A"),
+          escapeCell(row.itemName),
+          escapeCell(row.licenseType),
+          escapeCell(row.amountPaid.toFixed(2)),
+          escapeCell(formatSaleDate(row.purchasedAt))
+        ].join(",")
+      )
+    ];
+    const csv = lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const day = new Date().toISOString().slice(0, 10);
+    anchor.href = url;
+    anchor.download = `justron-sales-${day}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     if (!editCoverArtPreview.startsWith("blob:")) return;
@@ -891,6 +982,17 @@ export default function AdminUploadPage() {
           }`}
         >
           Drum Kits
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("sales")}
+          className={`rounded-full px-4 py-2 text-sm transition ${
+            activeTab === "sales"
+              ? "bg-zinc-100 font-semibold text-zinc-900"
+              : "border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          Sales
         </button>
       </div>
 
@@ -1629,6 +1731,72 @@ export default function AdminUploadPage() {
                   )}
                 </article>
               ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === "sales" && (
+        <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold text-zinc-100">Sales Dashboard</h2>
+              <p className="text-sm text-zinc-400">Total revenue: <span className="font-medium text-emerald-300">{formatUsd(totalRevenue)}</span></p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadSales()}
+                className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-200 transition hover:border-zinc-500"
+              >
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={exportSalesCsv}
+                className="rounded-full border border-zinc-700 px-4 py-2 text-xs text-zinc-200 transition hover:border-zinc-500"
+              >
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          {salesStatus.message && (
+            <p className={salesStatus.type === "error" ? "text-sm text-red-400" : "text-sm text-emerald-400"}>
+              {salesStatus.message}
+            </p>
+          )}
+
+          {isLoadingSales ? (
+            <p className="text-sm text-zinc-400">Loading sales...</p>
+          ) : !sales.length ? (
+            <p className="text-sm text-zinc-400">No Stripe sales found yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950">
+              <table className="min-w-full text-left text-xs text-zinc-300">
+                <thead className="border-b border-zinc-800 bg-zinc-900/70 text-zinc-400">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Buyer Name</th>
+                    <th className="px-3 py-2 font-medium">Buyer Email</th>
+                    <th className="px-3 py-2 font-medium">Item</th>
+                    <th className="px-3 py-2 font-medium">License</th>
+                    <th className="px-3 py-2 font-medium">Amount</th>
+                    <th className="px-3 py-2 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sales.map((sale) => (
+                    <tr key={sale.id} className="border-b border-zinc-900/80 last:border-0">
+                      <td className="px-3 py-2">{sale.buyerName || "N/A"}</td>
+                      <td className="px-3 py-2">{sale.buyerEmail || "N/A"}</td>
+                      <td className="px-3 py-2">{sale.itemName}</td>
+                      <td className="px-3 py-2 capitalize">{sale.licenseType}</td>
+                      <td className="px-3 py-2">{formatUsd(sale.amountPaid)}</td>
+                      <td className="px-3 py-2">{formatSaleDate(sale.purchasedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
