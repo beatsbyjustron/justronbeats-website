@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArtistTicker } from "@/components/artist-ticker";
 import { BeatStore } from "@/components/beat-store";
 import { FeaturedCarousel } from "@/components/featured-carousel";
+import { NewsletterCapture } from "@/components/newsletter-capture";
 import { fetchBeats, mapFeaturedProductions } from "@/lib/beats";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default async function HomePage() {
 
       <FeaturedCarousel productions={featuredProductions} />
       <BeatStore beats={beats} initiallyVisible={beats.length} />
+      <NewsletterCapture />
     </main>
   );
 }

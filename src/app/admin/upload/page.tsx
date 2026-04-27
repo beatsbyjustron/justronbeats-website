@@ -163,6 +163,10 @@ export default function AdminUploadPage() {
   const [editCoverArtPreview, setEditCoverArtPreview] = useState("");
   const [editCoverArtPath, setEditCoverArtPath] = useState("");
   const [editCoverInputKey, setEditCoverInputKey] = useState(0);
+  const [adminBeatQuery, setAdminBeatQuery] = useState("");
+  const [adminBeatBpmMin, setAdminBeatBpmMin] = useState("");
+  const [adminBeatBpmMax, setAdminBeatBpmMax] = useState("");
+  const [adminBeatKey, setAdminBeatKey] = useState("all");
 
   const expectedPassword = useMemo(() => process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD ?? "justron-admin", []);
 
@@ -358,6 +362,35 @@ export default function AdminUploadPage() {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   };
+
+  const adminBeatKeys = useMemo(() => {
+    const keys = beats.map((beat) => beat.key).filter(Boolean);
+    return Array.from(new Set(keys)).sort((a, b) => a.localeCompare(b));
+  }, [beats]);
+
+  const filteredAdminBeats = useMemo(() => {
+    const query = adminBeatQuery.trim().toLowerCase();
+    const min = Number(adminBeatBpmMin);
+    const max = Number(adminBeatBpmMax);
+    const hasMin = adminBeatBpmMin.trim() !== "" && Number.isFinite(min);
+    const hasMax = adminBeatBpmMax.trim() !== "" && Number.isFinite(max);
+
+    return beats.filter((beat) => {
+      const tags = beat.tags.join(" ").toLowerCase();
+      const collaborators = String(beat.producer_credits ?? "").toLowerCase();
+      const matchesText =
+        !query ||
+        beat.title.toLowerCase().includes(query) ||
+        beat.key.toLowerCase().includes(query) ||
+        String(beat.bpm).includes(query) ||
+        tags.includes(query) ||
+        collaborators.includes(query);
+      const matchesKey = adminBeatKey === "all" || beat.key.toLowerCase() === adminBeatKey.toLowerCase();
+      const matchesMin = !hasMin || beat.bpm >= min;
+      const matchesMax = !hasMax || beat.bpm <= max;
+      return matchesText && matchesKey && matchesMin && matchesMax;
+    });
+  }, [beats, adminBeatQuery, adminBeatKey, adminBeatBpmMin, adminBeatBpmMax]);
 
   useEffect(() => {
     if (!editCoverArtPreview.startsWith("blob:")) return;
@@ -1160,6 +1193,43 @@ export default function AdminUploadPage() {
           </button>
         </div>
 
+        <div className="grid gap-2 sm:grid-cols-4">
+          <input
+            value={adminBeatQuery}
+            onChange={(event) => setAdminBeatQuery(event.target.value)}
+            placeholder="Search title, tags, BPM, key, collaborators..."
+            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-100 sm:col-span-2"
+          />
+          <select
+            value={adminBeatKey}
+            onChange={(event) => setAdminBeatKey(event.target.value)}
+            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
+          >
+            <option value="all">All keys</option>
+            {adminBeatKeys.map((key) => (
+              <option key={key} value={key}>
+                {key}
+              </option>
+            ))}
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number"
+              value={adminBeatBpmMin}
+              onChange={(event) => setAdminBeatBpmMin(event.target.value)}
+              placeholder="Min BPM"
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
+            />
+            <input
+              type="number"
+              value={adminBeatBpmMax}
+              onChange={(event) => setAdminBeatBpmMax(event.target.value)}
+              placeholder="Max BPM"
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
+            />
+          </div>
+        </div>
+
         {editStatus.message && (
           <p className={editStatus.type === "error" ? "text-sm text-red-400" : "text-sm text-emerald-400"}>
             {editStatus.message}
@@ -1168,11 +1238,11 @@ export default function AdminUploadPage() {
 
         {isLoadingBeats ? (
           <p className="text-sm text-zinc-400">Loading beats...</p>
-        ) : !beats.length ? (
+        ) : !filteredAdminBeats.length ? (
           <p className="text-sm text-zinc-400">No beats uploaded yet.</p>
         ) : (
           <div className="space-y-3">
-            {beats.map((beat) => (
+            {filteredAdminBeats.map((beat) => (
               <article key={beat.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
                 {editingBeatId === beat.id ? (
                   <form onSubmit={saveEdit} className="grid gap-3">

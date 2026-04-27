@@ -27,6 +27,34 @@ const navLinks = [
   { href: "/contact", label: "Contact" }
 ];
 
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function TikTokIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M14 4v8.5a3.5 3.5 0 1 1-2.7-3.4" />
+      <path d="M14 7.2a5.5 5.5 0 0 0 3.8 1.6" />
+    </svg>
+  );
+}
+
+function YouTubeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <rect x="2.5" y="6" width="19" height="12" rx="3" />
+      <path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export default function RootLayout({
   children
 }: Readonly<{
@@ -52,9 +80,54 @@ export default function RootLayout({
                     {item.label}
                   </Link>
                 ))}
+                <div className="ml-1 flex items-center gap-2">
+                  <a
+                    href="https://www.instagram.com/justronbeats"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-zinc-700 p-1.5 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                    aria-label="Instagram"
+                  >
+                    <InstagramIcon />
+                  </a>
+                  <a
+                    href="https://www.tiktok.com/@justronbeats"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-zinc-700 p-1.5 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                    aria-label="TikTok"
+                  >
+                    <TikTokIcon />
+                  </a>
+                  <a
+                    href="https://www.youtube.com/@justron"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-zinc-700 p-1.5 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                    aria-label="YouTube"
+                  >
+                    <YouTubeIcon />
+                  </a>
+                </div>
               </nav>
             </header>
             {children}
+            <footer className="mt-16 border-t border-zinc-800 pt-6">
+              <div className="flex items-center justify-between text-xs text-zinc-500">
+                <p>© {new Date().getFullYear()} Justron Beats</p>
+                <div className="flex items-center gap-3">
+                  <a href="https://www.instagram.com/justronbeats" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300">
+                    Instagram
+                  </a>
+                  <a href="https://www.tiktok.com/@justronbeats" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300">
+                    TikTok
+                  </a>
+                  <a href="https://www.youtube.com/@justron" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300">
+                    YouTube
+                  </a>
+                </div>
+              </div>
+            </footer>
           </div>
         </GlobalAudioPlayerProvider>
       </body>
