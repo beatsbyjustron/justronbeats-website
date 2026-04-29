@@ -1,15 +1,10 @@
-const artists = [
-  { name: "Nettspend", listeners: "1,765,272 monthly listeners" },
-  { name: "Glokk40Spazz", listeners: "1,459,955 monthly listeners" },
-  { name: "Hardrock", listeners: "235,802 monthly listeners" },
-  { name: "Slimesito", listeners: "144,258 monthly listeners" },
-  { name: "Backend", listeners: "27,535 monthly listeners" },
-  { name: "Yung Fazo", listeners: "529,239 monthly listeners" },
-  { name: "Brennan Jones", listeners: "90,547 monthly listeners" },
-  { name: "Lazer Dim 700", listeners: "1,455,792 monthly listeners" }
-];
+import { CarouselArtist } from "@/components/types";
 
-export function ArtistTicker() {
+type ArtistTickerProps = {
+  artists: CarouselArtist[];
+};
+
+export function ArtistTicker({ artists }: ArtistTickerProps) {
   const items = [...artists, ...artists];
 
   return (
@@ -17,8 +12,24 @@ export function ArtistTicker() {
       <div className="artist-ticker-track flex w-max min-w-max max-w-none items-center gap-6 px-4 sm:gap-8 sm:px-6">
         {items.map((artist, index) => (
           <article key={`${artist.name}-${index}`} className="min-w-[180px] text-white">
-            <p className="text-sm font-medium">{artist.name}</p>
-            <p className="text-xs text-zinc-400">{artist.listeners}</p>
+            <div className="flex items-center gap-3">
+              {artist.imageUrl ? (
+                <img
+                  src={artist.imageUrl}
+                  alt={`${artist.name} profile`}
+                  className="h-10 w-10 rounded-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-full border border-zinc-800 bg-zinc-900" aria-hidden="true" />
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{artist.name}</p>
+                <p className="truncate text-xs text-zinc-400">
+                  {new Intl.NumberFormat("en-US").format(artist.monthlyListeners)} monthly listeners
+                </p>
+              </div>
+            </div>
           </article>
         ))}
       </div>

@@ -19,3 +19,12 @@ export type FeaturedProduction = {
   artist: string;
   coverArt: string;
 };
+
+export type CarouselArtist = {
+  id: string;
+  name: string;
+  spotifyUrl: string;
+  imageUrl: string | null;
+  monthlyListeners: number;
+  displayOrder: number;
+};

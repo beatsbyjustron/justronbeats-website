@@ -4,6 +4,7 @@ import { BeatStore } from "@/components/beat-store";
 import { FeaturedCarousel } from "@/components/featured-carousel";
 import { NewsletterCapture } from "@/components/newsletter-capture";
 import { fetchBeats, mapFeaturedProductions } from "@/lib/beats";
+import { fetchCarouselArtists } from "@/lib/carousel-artists";
 
 export const metadata: Metadata = {
   title: "Home | Justron Beats",
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const beats = await fetchBeats();
   const featuredProductions = mapFeaturedProductions(beats);
+  const carouselArtists = await fetchCarouselArtists();
 
   return (
     <main className="w-full min-w-0 space-y-12">
@@ -26,7 +28,7 @@ export default async function HomePage() {
 
       <section className="w-full min-w-0 space-y-3">
         <p className="text-center text-xs uppercase tracking-[0.2em] text-zinc-500 sm:text-left">Produced For</p>
-        <ArtistTicker />
+        <ArtistTicker artists={carouselArtists} />
       </section>
 
       <FeaturedCarousel productions={featuredProductions} />

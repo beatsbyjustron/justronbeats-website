@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AnalyzeResponse } from "@/lib/audio-analysis-contract";
+import { CarouselArtistsAdmin } from "./carousel-artists-admin";
 
 type Status = {
   type: "idle" | "error" | "success";
@@ -109,7 +110,7 @@ function formatFileSize(bytes: number) {
 
 export default function AdminUploadPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits" | "sales">("beats");
+  const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits" | "artists" | "sales">("beats");
   const [gatePassword, setGatePassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1138,6 +1139,17 @@ export default function AdminUploadPage() {
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab("artists")}
+          className={`rounded-full px-4 py-2 text-sm transition ${
+            activeTab === "artists"
+              ? "bg-zinc-100 font-semibold text-zinc-900"
+              : "border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          Artists
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab("sales")}
           className={`rounded-full px-4 py-2 text-sm transition ${
             activeTab === "sales"
@@ -1998,6 +2010,10 @@ export default function AdminUploadPage() {
             </div>
           )}
         </section>
+      )}
+
+      {activeTab === "artists" && (
+        <CarouselArtistsAdmin password={gatePassword || formPassword} />
       )}
 
       {activeTab === "sales" && (

@@ -117,6 +117,28 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["drum_kits"]["Insert"]>;
         Relationships: [];
       };
+      carousel_artists: {
+        Row: {
+          id: string;
+          created_at: string;
+          name: string;
+          spotify_url: string;
+          image_url: string | null;
+          monthly_listeners: number;
+          display_order: number;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          name: string;
+          spotify_url: string;
+          image_url?: string | null;
+          monthly_listeners?: number;
+          display_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["carousel_artists"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
