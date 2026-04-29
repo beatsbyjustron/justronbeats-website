@@ -1,8 +1,11 @@
 import "server-only";
 
 type SpotifyArtistProfile = {
+  id?: string;
   images?: Array<{ url?: string | null; width?: number | null; height?: number | null }>;
   name?: string;
+  followers?: { total?: number | null };
+  external_urls?: { spotify?: string | null };
 };
 
 let cachedAccessToken: { token: string; expiresAtMs: number } | null = null;
@@ -79,5 +82,57 @@ export async function fetchSpotifyArtistImageFromUrl(
     imageUrl,
     name: json.name ? String(json.name).trim() : null
   };
+}
+
+export type SpotifyArtistSearchResult = {
+  spotifyArtistId: string;
+  name: string;
+  spotifyUrl: string;
+  imageUrl: string | null;
+  monthlyListeners: number;
+};
+
+function mapArtistProfileToResult(profile: SpotifyArtistProfile): SpotifyArtistSearchResult | null {
+  const spotifyArtistId = String(profile.id ?? "").trim();
+  const name = String(profile.name ?? "").trim();
+  if (!spotifyArtistId || !name) return null;
+
+  const images = Array.isArray(profile.images) ? profile.images : [];
+  const imageUrl = images.find((img) => img?.url)?.url ? String(images.find((img) => img?.url)?.url).trim() : null;
+  const spotifyUrl = String(profile.external_urls?.spotify ?? "").trim();
+  // Spotify does not expose monthly listeners publicly; use follower total as the best available numeric signal.
+  const monthlyListeners = Math.max(0, Number(profile.followers?.total ?? 0) || 0);
+
+  return {
+    spotifyArtistId,
+    name,
+    spotifyUrl,
+    imageUrl,
+    monthlyListeners
+  };
+}
+
+export async function searchSpotifyArtists(query: string, limit = 8): Promise<SpotifyArtistSearchResult[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const token = await getSpotifyAccessToken();
+  const url = new URL("https://api.spotify.com/v1/search");
+  url.searchParams.set("q", trimmed);
+  url.searchParams.set("type", "artist");
+  url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 20)));
+
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Spotify artist search failed (${res.status}): ${text}`);
+  }
+
+  const json = (await res.json()) as { artists?: { items?: SpotifyArtistProfile[] } };
+  const items = Array.isArray(json.artists?.items) ? json.artists?.items : [];
+  return items.map(mapArtistProfileToResult).filter((item): item is SpotifyArtistSearchResult => Boolean(item));
 }
 

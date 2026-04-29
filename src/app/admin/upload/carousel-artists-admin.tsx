@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import type { CarouselArtist } from "@/components/types";
 
-type SpotifyImageFetchResult = {
-  imageUrl: string | null;
-  name: string | null;
+type SpotifyArtistSearchResult = {
   spotifyArtistId: string;
+  name: string;
+  spotifyUrl: string;
+  imageUrl: string | null;
+  monthlyListeners: number;
 };
 
 type CarouselArtistsAdminProps = {
@@ -18,10 +20,99 @@ function formatListeners(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.max(0, Math.floor(value)));
 }
 
-function parseMonthlyListeners(value: string) {
-  const normalized = value.replace(/,/g, "").trim();
-  const n = Number(normalized);
-  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+type ArtistSearchInputProps = {
+  password: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSelect: (artist: SpotifyArtistSearchResult) => void;
+  placeholder?: string;
+  disabled?: boolean;
+};
+
+function ArtistSearchInput({ password, value, onChange, onSelect, placeholder, disabled }: ArtistSearchInputProps) {
+  const [results, setResults] = useState<SpotifyArtistSearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const query = value.trim();
+    if (query.length < 2) {
+      setResults([]);
+      setIsOpen(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/admin/carousel-artists/spotify-search?q=${encodeURIComponent(query)}`, {
+          headers: { "x-admin-password": password }
+        });
+        const json = (await response.json()) as { artists?: SpotifyArtistSearchResult[] };
+        if (!response.ok) {
+          setResults([]);
+          setIsOpen(false);
+          setIsLoading(false);
+          return;
+        }
+        setResults(json.artists ?? []);
+        setIsOpen(true);
+      } catch {
+        setResults([]);
+        setIsOpen(false);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [value, password]);
+
+  return (
+    <div className="relative">
+      <input
+        name="jr-artists-spotify-search"
+        autoComplete="off"
+        placeholder={placeholder ?? "Search for an artist..."}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={() => {
+          if (results.length) setIsOpen(true);
+        }}
+        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+      />
+      {isLoading && (
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">Searching...</span>
+      )}
+      {isOpen && !!results.length && (
+        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl">
+          {results.map((artist) => (
+            <button
+              key={artist.spotifyArtistId}
+              type="button"
+              className="flex w-full items-center gap-3 border-b border-zinc-900 px-3 py-2 text-left hover:bg-zinc-900/70 last:border-b-0"
+              onClick={() => {
+                onSelect(artist);
+                setIsOpen(false);
+                setResults([]);
+              }}
+            >
+              {artist.imageUrl ? (
+                <img src={artist.imageUrl} alt={`${artist.name} profile`} className="h-9 w-9 rounded-full object-cover" />
+              ) : (
+                <div className="h-9 w-9 rounded-full border border-zinc-700 bg-zinc-900" aria-hidden="true" />
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm text-zinc-100">{artist.name}</p>
+                <p className="truncate text-xs text-zinc-400">{formatListeners(artist.monthlyListeners)} monthly listeners</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
@@ -32,32 +123,23 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
   });
 
   const [artists, setArtists] = useState<CarouselArtist[]>([]);
-  const [newForm, setNewForm] = useState<{
-    name: string;
-    spotifyUrl: string;
-    monthlyListeners: string;
-    imageUrl: string | null;
-  }>({
-    name: "",
-    spotifyUrl: "",
-    monthlyListeners: "",
-    imageUrl: null
-  });
-  const [isFetchingNewImage, setIsFetchingNewImage] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [selectedArtist, setSelectedArtist] = useState<SpotifyArtistSearchResult | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
     name: string;
     spotifyUrl: string;
-    monthlyListeners: string;
+    monthlyListeners: number;
     imageUrl: string | null;
+    searchValue: string;
   }>({
     name: "",
     spotifyUrl: "",
-    monthlyListeners: "",
-    imageUrl: null
+    monthlyListeners: 0,
+    imageUrl: null,
+    searchValue: ""
   });
-  const [isFetchingEditImage, setIsFetchingEditImage] = useState(false);
 
   const loadArtists = async () => {
     setIsLoading(true);
@@ -86,78 +168,11 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchSpotifyImage = async (spotifyUrl: string, mode: "new" | "edit") => {
-    const trimmed = spotifyUrl.trim();
-    if (!trimmed) return;
-    if (!trimmed.includes("spotify.com/artist/")) return;
-
-    if (mode === "new") setIsFetchingNewImage(true);
-    if (mode === "edit") setIsFetchingEditImage(true);
-
-    try {
-      const res = await fetch("/api/admin/carousel-artists/spotify-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": password
-        },
-        body: JSON.stringify({ spotifyUrl: trimmed })
-      });
-
-      const json = (await res.json()) as { error?: string; imageUrl?: string | null; name?: string | null };
-      if (!res.ok) {
-        setStatus({ type: "error", message: json.error ?? "Failed to fetch Spotify artist image." });
-        return;
-      }
-
-      const imageUrl = json.imageUrl ?? null;
-      const autoName = json.name ? String(json.name).trim() : null;
-
-      if (mode === "new") {
-        setNewForm((prev) => ({
-          ...prev,
-          imageUrl,
-          ...(prev.name.trim() ? {} : autoName ? { name: autoName } : {})
-        }));
-      } else {
-        setEditForm((prev) => ({
-          ...prev,
-          imageUrl,
-          ...(prev.name.trim() ? {} : autoName ? { name: autoName } : {})
-        }));
-
-        // Persist the photo immediately for existing artists.
-        if (editingId) {
-          await fetch("/api/admin/carousel-artists", {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              "x-admin-password": password
-            },
-            body: JSON.stringify({
-              id: editingId,
-              spotifyUrl: trimmed,
-              imageUrl
-            })
-          });
-        }
-      }
-    } catch (e) {
-      setStatus({ type: "error", message: e instanceof Error ? e.message : "Failed to fetch Spotify image." });
-    } finally {
-      if (mode === "new") setIsFetchingNewImage(false);
-      if (mode === "edit") setIsFetchingEditImage(false);
-    }
-  };
-
   const addArtist = async () => {
     setStatus({ type: "idle", message: "" });
     try {
-      const name = newForm.name.trim();
-      const spotifyUrl = newForm.spotifyUrl.trim();
-      const monthlyListeners = parseMonthlyListeners(newForm.monthlyListeners);
-      if (!name || !spotifyUrl) {
-        setStatus({ type: "error", message: "Name and Spotify artist URL are required." });
+      if (!selectedArtist) {
+        setStatus({ type: "error", message: "Pick an artist from Spotify search first." });
         return;
       }
 
@@ -168,10 +183,10 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
           "x-admin-password": password
         },
         body: JSON.stringify({
-          name,
-          spotifyUrl,
-          monthlyListeners,
-          imageUrl: newForm.imageUrl ?? null
+          name: selectedArtist.name,
+          spotifyUrl: selectedArtist.spotifyUrl,
+          monthlyListeners: selectedArtist.monthlyListeners,
+          imageUrl: selectedArtist.imageUrl ?? null
         })
       });
 
@@ -181,7 +196,8 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
         return;
       }
 
-      setNewForm({ name: "", spotifyUrl: "", monthlyListeners: "", imageUrl: null });
+      setSelectedArtist(null);
+      setSearchInput("");
       setStatus({ type: "success", message: "Artist added." });
       await loadArtists();
     } catch (e) {
@@ -194,16 +210,16 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
     setEditForm({
       name: artist.name,
       spotifyUrl: artist.spotifyUrl,
-      monthlyListeners: String(artist.monthlyListeners ?? ""),
-      imageUrl: artist.imageUrl
+      monthlyListeners: artist.monthlyListeners ?? 0,
+      imageUrl: artist.imageUrl,
+      searchValue: artist.name
     });
     setStatus({ type: "idle", message: "" });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ name: "", spotifyUrl: "", monthlyListeners: "", imageUrl: null });
-    setIsFetchingEditImage(false);
+    setEditForm({ name: "", spotifyUrl: "", monthlyListeners: 0, imageUrl: null, searchValue: "" });
   };
 
   const saveEdit = async () => {
@@ -213,10 +229,10 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
     try {
       const name = editForm.name.trim();
       const spotifyUrl = editForm.spotifyUrl.trim();
-      const monthlyListeners = parseMonthlyListeners(editForm.monthlyListeners);
+      const monthlyListeners = editForm.monthlyListeners;
 
       if (!name || !spotifyUrl) {
-        setStatus({ type: "error", message: "Name and Spotify artist URL are required." });
+        setStatus({ type: "error", message: "Select a Spotify artist before saving." });
         return;
       }
 
@@ -337,51 +353,27 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
         <div className="space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Add Artist</h3>
           <div className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-            <input
-              name="jr-artists-add-name"
-              autoComplete="off"
-              placeholder="Name"
-              value={newForm.name}
-              onChange={(e) => setNewForm((p) => ({ ...p, name: e.target.value }))}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
-            />
-            <input
-              name="jr-artists-add-spotify-url"
-              autoComplete="off"
-              placeholder="Spotify artist URL"
-              value={newForm.spotifyUrl}
-              onChange={(e) => setNewForm((p) => ({ ...p, spotifyUrl: e.target.value }))}
-              onPaste={(e) => {
-                const text = e.clipboardData.getData("text");
-                if (text.includes("spotify.com/artist/")) {
-                  // Let the input update, then fetch.
-                  setTimeout(() => void fetchSpotifyImage(text, "new"), 0);
-                }
+            <ArtistSearchInput
+              password={password}
+              value={searchInput}
+              onChange={setSearchInput}
+              onSelect={(artist) => {
+                setSelectedArtist(artist);
+                setSearchInput(artist.name);
               }}
-              onBlur={() => void fetchSpotifyImage(newForm.spotifyUrl, "new")}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
-            />
-
-            <input
-              name="jr-artists-add-monthly-listeners"
-              autoComplete="off"
-              inputMode="numeric"
-              type="number"
-              step={1}
-              placeholder="Monthly listeners"
-              value={newForm.monthlyListeners}
-              onChange={(e) => setNewForm((p) => ({ ...p, monthlyListeners: e.target.value }))}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+              placeholder="Search for an artist..."
             />
 
             <div className="flex items-center gap-3">
-              {newForm.imageUrl ? (
-                <img src={newForm.imageUrl} alt="Artist profile" className="h-12 w-12 rounded-full object-cover" />
+              {selectedArtist?.imageUrl ? (
+                <img src={selectedArtist.imageUrl} alt="Artist profile" className="h-12 w-12 rounded-full object-cover" />
               ) : (
                 <div className="h-12 w-12 rounded-full border border-zinc-700 bg-zinc-900" aria-hidden="true" />
               )}
               <div className="text-sm text-zinc-400">
-                {isFetchingNewImage ? "Fetching Spotify image..." : "Spotify image will be fetched automatically."}
+                {selectedArtist
+                  ? `${selectedArtist.name} - ${formatListeners(selectedArtist.monthlyListeners)} monthly listeners`
+                  : "Select an artist from Spotify results to auto-fill details."}
               </div>
             </div>
 
@@ -479,31 +471,21 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
                                 onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
                                 className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
                               />
-                              <input
-                                name="jr-artists-edit-spotify-url"
-                                autoComplete="off"
-                                placeholder="Spotify artist URL"
-                                value={editForm.spotifyUrl}
-                                onChange={(e) => setEditForm((p) => ({ ...p, spotifyUrl: e.target.value }))}
-                                onPaste={(e) => {
-                                  const text = e.clipboardData.getData("text");
-                                  if (text.includes("spotify.com/artist/")) {
-                                    setTimeout(() => void fetchSpotifyImage(text, "edit"), 0);
-                                  }
+                              <ArtistSearchInput
+                                password={password}
+                                value={editForm.searchValue}
+                                onChange={(value) => setEditForm((p) => ({ ...p, searchValue: value }))}
+                                onSelect={(artist) => {
+                                  setEditForm((p) => ({
+                                    ...p,
+                                    searchValue: artist.name,
+                                    name: artist.name,
+                                    spotifyUrl: artist.spotifyUrl,
+                                    imageUrl: artist.imageUrl,
+                                    monthlyListeners: artist.monthlyListeners
+                                  }));
                                 }}
-                                onBlur={() => void fetchSpotifyImage(editForm.spotifyUrl, "edit")}
-                                className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
-                              />
-                              <input
-                                name="jr-artists-edit-monthly-listeners"
-                                autoComplete="off"
-                                inputMode="numeric"
-                                type="number"
-                                step={1}
-                                placeholder="Monthly listeners"
-                                value={editForm.monthlyListeners}
-                                onChange={(e) => setEditForm((p) => ({ ...p, monthlyListeners: e.target.value }))}
-                                className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                                placeholder="Search for an artist..."
                               />
                               <div className="flex items-center gap-3">
                                 {editForm.imageUrl ? (
@@ -512,7 +494,7 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
                                   <div className="h-12 w-12 rounded-full border border-zinc-700 bg-zinc-900" aria-hidden="true" />
                                 )}
                                 <div className="text-sm text-zinc-400">
-                                  {isFetchingEditImage ? "Fetching Spotify image..." : "Photo updates when you paste a new Spotify URL."}
+                                  {formatListeners(editForm.monthlyListeners)} monthly listeners
                                 </div>
                               </div>
 
