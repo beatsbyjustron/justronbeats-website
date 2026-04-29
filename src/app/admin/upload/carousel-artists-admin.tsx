@@ -24,7 +24,7 @@ type ArtistSearchInputProps = {
   password: string;
   value: string;
   onChange: (value: string) => void;
-  onSelect: (artist: SpotifyArtistSearchResult) => void;
+  onSelect: (artist: SpotifyArtistSearchResult) => Promise<void> | void;
   placeholder?: string;
   disabled?: boolean;
 };
@@ -45,7 +45,7 @@ function ArtistSearchInput({ password, value, onChange, onSelect, placeholder, d
     const timeout = window.setTimeout(async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/admin/carousel-artists/spotify-search?q=${encodeURIComponent(query)}`, {
+        const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`, {
           headers: { "x-admin-password": password }
         });
         const json = (await response.json()) as { artists?: SpotifyArtistSearchResult[] };
@@ -63,7 +63,7 @@ function ArtistSearchInput({ password, value, onChange, onSelect, placeholder, d
       } finally {
         setIsLoading(false);
       }
-    }, 250);
+    }, 300);
 
     return () => window.clearTimeout(timeout);
   }, [value, password]);
@@ -73,7 +73,7 @@ function ArtistSearchInput({ password, value, onChange, onSelect, placeholder, d
       <input
         name="jr-artists-spotify-search"
         autoComplete="off"
-        placeholder={placeholder ?? "Search for an artist..."}
+        placeholder={placeholder ?? "Search for an artist on Spotify..."}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -92,8 +92,8 @@ function ArtistSearchInput({ password, value, onChange, onSelect, placeholder, d
               key={artist.spotifyArtistId}
               type="button"
               className="flex w-full items-center gap-3 border-b border-zinc-900 px-3 py-2 text-left hover:bg-zinc-900/70 last:border-b-0"
-              onClick={() => {
-                onSelect(artist);
+              onClick={async () => {
+                await onSelect(artist);
                 setIsOpen(false);
                 setResults([]);
               }}
@@ -124,7 +124,7 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
 
   const [artists, setArtists] = useState<CarouselArtist[]>([]);
   const [searchInput, setSearchInput] = useState("");
-  const [selectedArtist, setSelectedArtist] = useState<SpotifyArtistSearchResult | null>(null);
+  const [isAddingArtist, setIsAddingArtist] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
@@ -168,13 +168,10 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addArtist = async () => {
+  const addArtistFromSelection = async (artist: SpotifyArtistSearchResult) => {
     setStatus({ type: "idle", message: "" });
     try {
-      if (!selectedArtist) {
-        setStatus({ type: "error", message: "Pick an artist from Spotify search first." });
-        return;
-      }
+      setIsAddingArtist(true);
 
       const res = await fetch("/api/admin/carousel-artists", {
         method: "POST",
@@ -183,10 +180,10 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
           "x-admin-password": password
         },
         body: JSON.stringify({
-          name: selectedArtist.name,
-          spotifyUrl: selectedArtist.spotifyUrl,
-          monthlyListeners: selectedArtist.monthlyListeners,
-          imageUrl: selectedArtist.imageUrl ?? null
+          name: artist.name,
+          spotifyUrl: artist.spotifyUrl,
+          monthlyListeners: artist.monthlyListeners,
+          imageUrl: artist.imageUrl ?? null
         })
       });
 
@@ -196,12 +193,13 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
         return;
       }
 
-      setSelectedArtist(null);
       setSearchInput("");
-      setStatus({ type: "success", message: "Artist added." });
+      setStatus({ type: "success", message: `Added ${artist.name} to carousel.` });
       await loadArtists();
     } catch (e) {
       setStatus({ type: "error", message: e instanceof Error ? e.message : "Failed to add artist." });
+    } finally {
+      setIsAddingArtist(false);
     }
   };
 
@@ -357,32 +355,22 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
               password={password}
               value={searchInput}
               onChange={setSearchInput}
-              onSelect={(artist) => {
-                setSelectedArtist(artist);
-                setSearchInput(artist.name);
-              }}
-              placeholder="Search for an artist..."
+              onSelect={addArtistFromSelection}
+              placeholder="Search for an artist on Spotify..."
+              disabled={isAddingArtist}
             />
-
-            <div className="flex items-center gap-3">
-              {selectedArtist?.imageUrl ? (
-                <img src={selectedArtist.imageUrl} alt="Artist profile" className="h-12 w-12 rounded-full object-cover" />
-              ) : (
-                <div className="h-12 w-12 rounded-full border border-zinc-700 bg-zinc-900" aria-hidden="true" />
-              )}
-              <div className="text-sm text-zinc-400">
-                {selectedArtist
-                  ? `${selectedArtist.name} - ${formatListeners(selectedArtist.monthlyListeners)} monthly listeners`
-                  : "Select an artist from Spotify results to auto-fill details."}
-              </div>
-            </div>
-
+            <p className="text-xs text-zinc-500">
+              Type 2+ characters, then click an artist to add instantly.
+            </p>
+            {isAddingArtist && (
+              <p className="text-xs text-zinc-400">Adding artist...</p>
+            )}
             <button
               type="button"
-              onClick={() => void addArtist()}
-              className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200"
+              onClick={() => void loadArtists()}
+              className="w-max rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-500"
             >
-              Add Artist
+              Refresh list
             </button>
           </div>
         </div>
