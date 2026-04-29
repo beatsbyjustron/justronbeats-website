@@ -14,6 +14,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
+  const spotifyClientId = process.env.SPOTIFY_CLIENT_ID;
+  const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!spotifyClientId || !spotifyClientSecret) {
+    console.error("[api/spotify/search] Missing Spotify credentials", {
+      hasClientId: Boolean(spotifyClientId),
+      hasClientSecret: Boolean(spotifyClientSecret)
+    });
+    return NextResponse.json({ error: "Missing Spotify credentials" }, { status: 500 });
+  }
+
   try {
     const url = new URL(request.url);
     const query = String(url.searchParams.get("q") ?? "").trim();
