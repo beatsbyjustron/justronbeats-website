@@ -9,6 +9,13 @@ type SpotifyArtistProfile = {
 };
 
 let cachedAccessToken: { token: string; expiresAtMs: number } | null = null;
+let cachedTokenKey = "";
+
+function normalizeEnvValue(value: string | undefined) {
+  return String(value ?? "")
+    .trim()
+    .replace(/^['"]|['"]$/g, "");
+}
 
 function getSpotifyArtistIdFromUrl(spotifyUrl: string): string | null {
   const trimmed = spotifyUrl.trim();
@@ -18,35 +25,64 @@ function getSpotifyArtistIdFromUrl(spotifyUrl: string): string | null {
 
 async function getSpotifyAccessToken(): Promise<string> {
   const now = Date.now();
+  const clientId = normalizeEnvValue(process.env.SPOTIFY_CLIENT_ID);
+  const clientSecret = normalizeEnvValue(process.env.SPOTIFY_CLIENT_SECRET);
+  const credentialKey = `${clientId.length}:${clientSecret.length}`;
+
+  // If credentials changed (or were fixed), avoid reusing stale cached tokens.
+  if (cachedTokenKey !== credentialKey) {
+    cachedAccessToken = null;
+    cachedTokenKey = credentialKey;
+  }
+
   if (cachedAccessToken && cachedAccessToken.expiresAtMs > now + 30_000) {
     return cachedAccessToken.token;
   }
 
-  const clientId = process.env.SPOTIFY_CLIENT_ID?.trim();
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) {
+    console.error("[spotify] Missing credentials", {
+      hasClientId: Boolean(clientId),
+      hasClientSecret: Boolean(clientSecret),
+      clientIdLength: clientId.length,
+      clientSecretLength: clientSecret.length
+    });
     throw new Error("Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET env vars.");
   }
 
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const body = new URLSearchParams({ grant_type: "client_credentials" });
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       Authorization: `Basic ${basic}`,
-      "Content-Type": "application/x-www-form-urlencoded"
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json"
     },
-    body: "grant_type=client_credentials"
+    body
   });
 
+  const rawTokenResponse = await res.text().catch(() => "");
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Spotify auth failed (${res.status}): ${text}`);
+    console.error("[spotify] Token request failed", {
+      status: res.status,
+      response: rawTokenResponse
+    });
+    throw new Error(`Spotify auth failed (${res.status}): ${rawTokenResponse}`);
   }
 
-  const json = (await res.json()) as { access_token?: string; expires_in?: number };
+  let json: { access_token?: string; expires_in?: number };
+  try {
+    json = JSON.parse(rawTokenResponse) as { access_token?: string; expires_in?: number };
+  } catch {
+    console.error("[spotify] Token response was not JSON", { rawTokenResponse });
+    throw new Error("Spotify auth returned invalid JSON.");
+  }
   const token = String(json.access_token ?? "").trim();
   const expiresIn = Number(json.expires_in ?? 3600);
-  if (!token) throw new Error("Spotify auth returned no access_token.");
+  if (!token) {
+    console.error("[spotify] Missing access_token in token response", { rawTokenResponse });
+    throw new Error("Spotify auth returned no access_token.");
+  }
 
   cachedAccessToken = { token, expiresAtMs: now + expiresIn * 1000 };
   return token;
@@ -123,15 +159,29 @@ export async function searchSpotifyArtists(query: string, limit = 8): Promise<Sp
   url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 20)));
 
   const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json"
+    }
   });
 
+  const rawSearchResponse = await res.text().catch(() => "");
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Spotify artist search failed (${res.status}): ${text}`);
+    console.error("[spotify] Search request failed", {
+      status: res.status,
+      query: trimmed,
+      response: rawSearchResponse
+    });
+    throw new Error(`Spotify artist search failed (${res.status}): ${rawSearchResponse}`);
   }
 
-  const json = (await res.json()) as { artists?: { items?: SpotifyArtistProfile[] } };
+  let json: { artists?: { items?: SpotifyArtistProfile[] } };
+  try {
+    json = JSON.parse(rawSearchResponse) as { artists?: { items?: SpotifyArtistProfile[] } };
+  } catch {
+    console.error("[spotify] Search response was not JSON", { query: trimmed, rawSearchResponse });
+    throw new Error("Spotify search returned invalid JSON.");
+  }
   const items = Array.isArray(json.artists?.items) ? json.artists?.items : [];
   return items.map(mapArtistProfileToResult).filter((item): item is SpotifyArtistSearchResult => Boolean(item));
 }

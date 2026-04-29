@@ -25,6 +25,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ artists });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to search Spotify artists.";
+    console.error("[api/spotify/search] Request failed", {
+      message,
+      query: (() => {
+        try {
+          return String(new URL(request.url).searchParams.get("q") ?? "").slice(0, 120);
+        } catch {
+          return "";
+        }
+      })()
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
