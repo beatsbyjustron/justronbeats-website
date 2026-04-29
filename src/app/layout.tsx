@@ -24,7 +24,8 @@ const navLinks = [
   { href: "/kits", label: "Kits" },
   { href: "/productions", label: "Productions" },
   { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" }
+  { href: "/contact", label: "Contact" },
+  { href: "/faq", label: "FAQ" }
 ];
 
 function InstagramIcon() {
@@ -117,16 +118,42 @@ export default function RootLayout({
             {children}
             <footer className="mt-16 border-t border-zinc-800 pt-6">
               <div className="flex flex-col items-center justify-between gap-4 text-xs text-zinc-500 sm:flex-row">
-                <p>© {new Date().getFullYear()} Justron Beats</p>
+                <p>© 2025 Justron LLC. All rights reserved.</p>
                 <div className="flex items-center gap-3">
-                  <a href="https://www.instagram.com/justronbeats" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300">
-                    Instagram
+                  <Link href="/terms" className="hover:text-zinc-300">
+                    Terms
+                  </Link>
+                  <Link href="/faq" className="hover:text-zinc-300">
+                    FAQ
+                  </Link>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="https://www.instagram.com/justronbeats"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-zinc-700 p-1.5 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                    aria-label="Instagram"
+                  >
+                    <InstagramIcon />
                   </a>
-                  <a href="https://www.tiktok.com/@justronbeats" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300">
-                    TikTok
+                  <a
+                    href="https://www.tiktok.com/@justronbeats"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-zinc-700 p-1.5 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                    aria-label="TikTok"
+                  >
+                    <TikTokIcon />
                   </a>
-                  <a href="https://www.youtube.com/@justron" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300">
-                    YouTube
+                  <a
+                    href="https://www.youtube.com/@justron"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-zinc-700 p-1.5 text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+                    aria-label="YouTube"
+                  >
+                    <YouTubeIcon />
                   </a>
                 </div>
               </div>
