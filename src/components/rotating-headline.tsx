@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 const PHRASES = [
   "Official Beat Store",
   "10 Million+ Streams & Counting",
-  "ThebBest beats to make hits"
+  "The best beats to make hits"
 ];
 
 export function RotatingHeadline() {
