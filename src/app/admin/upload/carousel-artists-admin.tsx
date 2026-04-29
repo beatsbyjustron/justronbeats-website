@@ -45,7 +45,7 @@ function ArtistSearchInput({ password, value, onChange, onSelect, placeholder, d
     const timeout = window.setTimeout(async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`, {
+        const response = await fetch(`/api/admin/carousel-artists/search?q=${encodeURIComponent(query)}`, {
           headers: { "x-admin-password": password }
         });
         const json = (await response.json()) as { artists?: SpotifyArtistSearchResult[] };
