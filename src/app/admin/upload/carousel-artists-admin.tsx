@@ -124,6 +124,8 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
 
   const [artists, setArtists] = useState<CarouselArtist[]>([]);
   const [searchInput, setSearchInput] = useState("");
+  const [selectedArtist, setSelectedArtist] = useState<SpotifyArtistSearchResult | null>(null);
+  const [manualMonthlyListeners, setManualMonthlyListeners] = useState("");
   const [isAddingArtist, setIsAddingArtist] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -168,8 +170,17 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addArtistFromSelection = async (artist: SpotifyArtistSearchResult) => {
+  const addArtist = async () => {
     setStatus({ type: "idle", message: "" });
+    if (!selectedArtist) {
+      setStatus({ type: "error", message: "Select an artist from Spotify search first." });
+      return;
+    }
+    const listeners = Number(manualMonthlyListeners.replace(/,/g, "").trim());
+    if (!Number.isFinite(listeners) || listeners < 0) {
+      setStatus({ type: "error", message: "Enter a valid monthly listeners number." });
+      return;
+    }
     try {
       setIsAddingArtist(true);
 
@@ -180,10 +191,10 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
           "x-admin-password": password
         },
         body: JSON.stringify({
-          name: artist.name,
-          spotifyUrl: artist.spotifyUrl,
-          monthlyListeners: artist.monthlyListeners,
-          imageUrl: artist.imageUrl ?? null
+          name: selectedArtist.name,
+          spotifyUrl: selectedArtist.spotifyUrl,
+          monthlyListeners: Math.floor(listeners),
+          imageUrl: selectedArtist.imageUrl ?? null
         })
       });
 
@@ -193,8 +204,11 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
         return;
       }
 
+      const addedName = selectedArtist.name;
       setSearchInput("");
-      setStatus({ type: "success", message: `Added ${artist.name} to carousel.` });
+      setSelectedArtist(null);
+      setManualMonthlyListeners("");
+      setStatus({ type: "success", message: `Added ${addedName} to carousel.` });
       await loadArtists();
     } catch (e) {
       setStatus({ type: "error", message: e instanceof Error ? e.message : "Failed to add artist." });
@@ -354,23 +368,46 @@ export function CarouselArtistsAdmin({ password }: CarouselArtistsAdminProps) {
             <ArtistSearchInput
               password={password}
               value={searchInput}
-              onChange={setSearchInput}
-              onSelect={addArtistFromSelection}
+              onChange={(value) => {
+                setSearchInput(value);
+                if (!value.trim()) {
+                  setSelectedArtist(null);
+                  setManualMonthlyListeners("");
+                }
+              }}
+              onSelect={(artist) => {
+                setSelectedArtist(artist);
+                setSearchInput(artist.name);
+                // Keep this empty so admin can type current Spotify number manually.
+                setManualMonthlyListeners("");
+              }}
               placeholder="Search for an artist on Spotify..."
               disabled={isAddingArtist}
             />
-            <p className="text-xs text-zinc-500">
-              Type 2+ characters, then click an artist to add instantly.
-            </p>
+            <input
+              name="jr-artists-manual-monthly-listeners"
+              autoComplete="off"
+              inputMode="numeric"
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Monthly Listeners"
+              disabled={isAddingArtist || !selectedArtist}
+              value={manualMonthlyListeners}
+              onChange={(event) => setManualMonthlyListeners(event.target.value)}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <p className="text-xs text-zinc-500">Select artist from Spotify, enter listeners, then click Add Artist.</p>
             {isAddingArtist && (
               <p className="text-xs text-zinc-400">Adding artist...</p>
             )}
             <button
               type="button"
-              onClick={() => void loadArtists()}
-              className="w-max rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-500"
+              onClick={() => void addArtist()}
+              disabled={!selectedArtist || !manualMonthlyListeners.trim() || isAddingArtist}
+              className="w-max rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Refresh list
+              Add Artist
             </button>
           </div>
         </div>
