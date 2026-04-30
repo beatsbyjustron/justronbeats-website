@@ -15,6 +15,7 @@
     "googleapis": "^171.4.0",
     "music-tempo": "^1.0.3",
     "next": "latest",
+    "posthog-js": "^1.372.5",
     "react": "latest",
     "react-dom": "latest",
     "resend": "^6.12.2",
