@@ -20,10 +20,11 @@ function randomBetween(a: number, b: number) {
 
 function createRings(width: number, height: number): Ring[] {
   const rings: Ring[] = [];
+  /** ~250–350px diameter */
   const radii = [
-    randomBetween(150, 250),
-    randomBetween(150, 250),
-    randomBetween(150, 250)
+    randomBetween(125, 175),
+    randomBetween(125, 175),
+    randomBetween(125, 175)
   ];
 
   for (let i = 0; i < 3; i++) {
@@ -138,29 +139,69 @@ function stepPhysics(rings: Ring[], w: number, h: number, dt: number) {
   clampRingsToBounds(rings, w, h);
 }
 
+/**
+ * Soft neon tube: ~15–20% peak opacity, diffused halo (shadow + blur),
+ * feathered edges so it blends into the background.
+ */
 function drawNeonRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  const strokePass = (
-    shadowBlur: number,
-    shadowAlpha: number,
-    strokeAlpha: number,
-    lineWidth: number
-  ) => {
+  const strokePass = (opts: {
+    filter: string;
+    shadowBlur: number;
+    shadowAlpha: number;
+    strokeAlpha: number;
+    lineWidth: number;
+  }) => {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.shadowBlur = shadowBlur;
-    ctx.shadowColor = `rgba(${NEON_RGB}, ${shadowAlpha})`;
-    ctx.strokeStyle = `rgba(${NEON_RGB}, ${strokeAlpha})`;
-    ctx.lineWidth = lineWidth;
+    ctx.filter = opts.filter;
+    ctx.shadowBlur = opts.shadowBlur;
+    ctx.shadowColor = `rgba(${NEON_RGB}, ${opts.shadowAlpha})`;
+    ctx.strokeStyle = `rgba(${NEON_RGB}, ${opts.strokeAlpha})`;
+    ctx.lineWidth = opts.lineWidth;
     ctx.lineCap = "round";
     ctx.stroke();
   };
 
   ctx.save();
-  strokePass(52, 0.42, 0.1, 3.5);
-  strokePass(30, 0.32, 0.16, 2.25);
-  strokePass(14, 0.22, 0.22, 1.6);
+
+  strokePass({
+    filter: "blur(14px)",
+    shadowBlur: 100,
+    shadowAlpha: 0.07,
+    strokeAlpha: 0.055,
+    lineWidth: 36
+  });
+  strokePass({
+    filter: "blur(8px)",
+    shadowBlur: 72,
+    shadowAlpha: 0.1,
+    strokeAlpha: 0.085,
+    lineWidth: 22
+  });
+  strokePass({
+    filter: "blur(4px)",
+    shadowBlur: 44,
+    shadowAlpha: 0.12,
+    strokeAlpha: 0.12,
+    lineWidth: 12
+  });
+  strokePass({
+    filter: "blur(2px)",
+    shadowBlur: 28,
+    shadowAlpha: 0.14,
+    strokeAlpha: 0.155,
+    lineWidth: 6
+  });
+  ctx.filter = "none";
   ctx.shadowBlur = 0;
-  strokePass(0, 0, 0.38, 1.15);
+  strokePass({
+    filter: "blur(1px)",
+    shadowBlur: 0,
+    shadowAlpha: 0,
+    strokeAlpha: 0.18,
+    lineWidth: 2.25
+  });
+
   ctx.restore();
 }
 
