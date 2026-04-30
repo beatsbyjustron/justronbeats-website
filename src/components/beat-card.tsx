@@ -120,7 +120,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
   return (
     <article
       data-beat-id={beat.id}
-      className="relative max-w-full min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 transition hover:border-zinc-700 sm:p-5"
+      className="relative max-w-full min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 p-4 transition hover:border-zinc-700 sm:p-5"
       onClick={onCardClick}
     >
       <div className="absolute right-3 top-3">

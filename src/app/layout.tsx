@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BackgroundAmbience } from "@/components/background-ambience";
+import { AmbientParticles } from "@/components/ambient-particles";
 import { GlobalAudioPlayerProvider } from "@/components/global-audio-player-provider";
 import "./globals.css";
 
@@ -63,11 +63,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="relative isolate overflow-x-hidden">
-        <BackgroundAmbience />
+      <body className="relative isolate overflow-x-hidden bg-black">
+        <AmbientParticles />
         <GlobalAudioPlayerProvider>
-          <div className="mx-auto min-h-screen w-full max-w-6xl min-w-0 px-4 pb-28 pt-8 sm:px-6">
-            <header className="mb-12 flex flex-col gap-6 border-b border-zinc-800 pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4">
+          <div className="relative z-10 mx-auto min-h-screen w-full max-w-6xl min-w-0 px-4 pb-28 pt-8 sm:px-6">
+            <header className="relative z-20 -mx-4 mb-12 flex flex-col gap-6 border-b border-zinc-800 bg-black px-4 pb-6 sm:-mx-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4 sm:px-6">
               <Link
                 href="/"
                 className="shrink-0 text-center text-lg font-semibold tracking-wide text-zinc-100 sm:text-left"
@@ -116,7 +116,7 @@ export default function RootLayout({
               </nav>
             </header>
             {children}
-            <footer className="mt-16 border-t border-zinc-800 pt-6">
+            <footer className="relative z-10 -mx-4 mt-16 border-t border-zinc-800 bg-black px-4 pt-6 sm:-mx-6 sm:px-6">
               <div className="flex flex-col items-center justify-between gap-4 text-xs text-zinc-500 sm:flex-row">
                 <p>© 2025 Justron LLC. All rights reserved.</p>
                 <div className="flex items-center gap-3">
