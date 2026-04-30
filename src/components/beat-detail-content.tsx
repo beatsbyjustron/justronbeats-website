@@ -1,10 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Beat } from "@/components/types";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
 import { useSignedStorageUrl } from "@/components/use-signed-storage-url";
+import { getRelatedBeats } from "@/lib/related-beats";
 
 type BeatDetailContentProps = {
   beat: Beat;
@@ -36,6 +38,11 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
   const [checkoutError, setCheckoutError] = useState("");
   const [showLicenseTerms, setShowLicenseTerms] = useState(false);
   const signedCoverArtUrl = useSignedStorageUrl(beat.coverArtUrl);
+
+  const relatedBeats = useMemo(
+    () => (queueBeats?.length ? getRelatedBeats(beat, queueBeats, 3) : []),
+    [beat, queueBeats]
+  );
 
   useEffect(() => {
     setQueue(queueBeats?.length ? queueBeats : [beat]);
@@ -100,6 +107,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
   };
 
   return (
+    <>
     <section className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex flex-col gap-4 sm:flex-row">
         {signedCoverArtUrl ? (
@@ -215,5 +223,28 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
         </div>
       )}
     </section>
+
+    <section className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950/80 p-5">
+      <p className="text-xs uppercase tracking-wide text-zinc-500">Suggested beats</p>
+      {relatedBeats.length ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {relatedBeats.map((related) => (
+            <Link
+              key={related.id}
+              href={`/beats/${related.slug}`}
+              className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition hover:border-zinc-600"
+            >
+              <p className="font-medium text-zinc-200">{related.title}</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                {related.bpm} BPM • {related.key}
+              </p>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-zinc-500">No close matches yet.</p>
+      )}
+    </section>
+    </>
   );
 }

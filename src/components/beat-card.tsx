@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, MouseEvent, useState } from "react";
+import Link from "next/link";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { Beat } from "@/components/types";
 import { useRouter } from "next/navigation";
@@ -253,12 +254,17 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
           {suggestions.length ? (
             <div className="grid gap-2 sm:grid-cols-3">
               {suggestions.map((suggestedBeat) => (
-                <div key={suggestedBeat.id} className="rounded-lg border border-zinc-800 bg-zinc-900 p-2">
+                <Link
+                  key={suggestedBeat.id}
+                  href={`/beats/${suggestedBeat.slug}`}
+                  className="block rounded-lg border border-zinc-800 bg-zinc-900 p-2 transition hover:border-zinc-600"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <p className="text-sm text-zinc-200">{suggestedBeat.title}</p>
                   <p className="text-xs text-zinc-500">
                     {suggestedBeat.bpm} BPM • {suggestedBeat.key}
                   </p>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (

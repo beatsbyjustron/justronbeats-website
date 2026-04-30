@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BeatCard } from "@/components/beat-card";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
 import { Beat } from "@/components/types";
+import { getRelatedBeats } from "@/lib/related-beats";
 
 type BeatStoreProps = {
   beats: Beat[];
@@ -89,20 +90,6 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
     return () => window.clearTimeout(timeout);
   }, [beats, initiallyVisible]);
 
-  const getSuggestions = (currentBeat: Beat) => {
-    return filteredBeats
-      .filter((beat) => beat.id !== currentBeat.id)
-      .map((beat) => {
-        const bpmDiff = Math.abs(beat.bpm - currentBeat.bpm);
-        const sharedTags = beat.tags.filter((tag) => currentBeat.tags.includes(tag)).length;
-        const score = sharedTags * 10 - bpmDiff;
-        return { beat, score };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
-      .map((entry) => entry.beat);
-  };
-
   const minPercent = ((bpmMin - BPM_RANGE_MIN) / (BPM_RANGE_MAX - BPM_RANGE_MIN)) * 100;
   const maxPercent = ((bpmMax - BPM_RANGE_MIN) / (BPM_RANGE_MAX - BPM_RANGE_MIN)) * 100;
 
@@ -186,7 +173,7 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
               beat={beat}
               isExpanded={expandedBeatId === beat.id}
               onToggle={() => setExpandedBeatId((prev) => (prev === beat.id ? null : beat.id))}
-              suggestions={getSuggestions(beat)}
+              suggestions={getRelatedBeats(beat, filteredBeats, 3)}
               onTagClick={(tag) => setSearchQuery(tag)}
             />
           ))
