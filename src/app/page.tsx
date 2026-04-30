@@ -66,7 +66,7 @@ export default async function HomePage() {
               />
             )}
             <div>
-            <p className="text-xl font-semibold text-zinc-100">Lifestyle • Yung Fazo × Yuck</p>
+            <p className="text-xl font-semibold text-zinc-100">Lifestyle • Yung Fazo & Yuck</p>
             <p className="text-sm text-zinc-300">Listen your way, then explore a collection of beats built to inspire your next track.</p>
             </div>
           </div>
