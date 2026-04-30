@@ -1,8 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Beat } from "@/components/types";
+import { SuggestedBeatLink } from "@/components/suggested-beat-link";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
 import { useSignedStorageUrl } from "@/components/use-signed-storage-url";
@@ -229,16 +229,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
       {relatedBeats.length ? (
         <div className="grid gap-3 sm:grid-cols-3">
           {relatedBeats.map((related) => (
-            <Link
-              key={related.id}
-              href={`/beats/${related.slug}`}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition hover:border-zinc-600"
-            >
-              <p className="font-medium text-zinc-200">{related.title}</p>
-              <p className="mt-1 text-xs text-zinc-500">
-                {related.bpm} BPM • {related.key}
-              </p>
-            </Link>
+            <SuggestedBeatLink key={related.id} beat={related} />
           ))}
         </div>
       ) : (

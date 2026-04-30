@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AmbientParticles } from "@/components/ambient-particles";
+import { TsparticlesBackground } from "@/components/tsparticles-background";
 import { GlobalAudioPlayerProvider } from "@/components/global-audio-player-provider";
 import "./globals.css";
 
@@ -64,7 +64,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="relative isolate overflow-x-hidden bg-black">
-        <AmbientParticles />
+        <TsparticlesBackground />
         <GlobalAudioPlayerProvider>
           <div className="relative z-10 mx-auto min-h-screen w-full max-w-6xl min-w-0 px-4 pb-28 pt-8 sm:px-6">
             <header className="relative z-20 -mx-4 mb-12 flex flex-col gap-6 border-b border-zinc-800 bg-black px-4 pb-6 sm:-mx-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4 sm:px-6">
