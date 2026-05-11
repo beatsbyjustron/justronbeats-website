@@ -51,7 +51,14 @@ export default async function HomePage() {
         <p className="text-zinc-400">Browse beats. Own your sound.</p>
       </section>
 
-      <ReleaseSpotlightRotator coverUrl={newestReleaseCover} releaseLinks={releaseLinks} btsUrl={BTS_VIDEO_URL} />
+      <ReleaseSpotlightRotator
+        coverUrl={newestReleaseCover}
+        releaseTitle={newestRelease?.title?.trim() || "Lifestyle"}
+        releaseArtist={newestRelease?.artist?.trim() || "Yung Fazo & Yuck"}
+        featuringCredit="Yung Fazo & Yuck"
+        releaseLinks={releaseLinks}
+        btsUrl={BTS_VIDEO_URL}
+      />
 
       <section className="w-full min-w-0 space-y-3">
         <p className="text-center text-xs uppercase tracking-[0.2em] text-zinc-500 sm:text-left">Produced For</p>
