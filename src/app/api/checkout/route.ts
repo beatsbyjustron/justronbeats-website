@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
+import { BASE_BEAT_LEASE_PRICE_CENTS, getBeatLeasePriceCents } from "@/lib/pricing";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -32,8 +34,33 @@ export async function POST(request: Request) {
     const drumKitId = body.drumKitId?.trim() || "";
     const title = body.title?.trim() || "Beat Lease";
     const image = body.image?.trim() || "";
-    const priceCents = Number(body.priceCents ?? 3000);
-    const unitAmount = Number.isFinite(priceCents) && priceCents > 0 ? Math.round(priceCents) : 3000;
+    const requestedPriceCents = Number(body.priceCents ?? BASE_BEAT_LEASE_PRICE_CENTS);
+    let checkoutTitle = title;
+    let unitAmount =
+      Number.isFinite(requestedPriceCents) && requestedPriceCents > 0
+        ? Math.round(requestedPriceCents)
+        : BASE_BEAT_LEASE_PRICE_CENTS;
+
+    if (itemType === "beat") {
+      unitAmount = BASE_BEAT_LEASE_PRICE_CENTS;
+      const supabase = getSupabaseServerClient();
+      if (supabase && beatId) {
+        const { data: beat, error } = await supabase
+          .from("beats")
+          .select("title, lease_price")
+          .eq("id", beatId)
+          .maybeSingle();
+
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        if (beat) {
+          checkoutTitle = beat.title || checkoutTitle;
+          unitAmount = getBeatLeasePriceCents(beat.lease_price);
+        }
+      }
+    }
 
     const origin = request.headers.get("origin") || "http://localhost:3000";
 
@@ -47,7 +74,7 @@ export async function POST(request: Request) {
             currency: "usd",
             unit_amount: unitAmount,
             product_data: {
-              name: itemType === "drum_kit" ? `${title} - Drum Kit` : `${title} - Lease`,
+              name: itemType === "drum_kit" ? `${checkoutTitle} - Drum Kit` : `${checkoutTitle} - Lease`,
               ...(image ? { images: [image] } : {})
             }
           }

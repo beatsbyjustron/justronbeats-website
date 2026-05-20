@@ -1,4 +1,5 @@
 import { Beat, FeaturedProduction } from "@/components/types";
+import { getBeatLeasePrice } from "@/lib/pricing";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabasePublicObjectUrl, toSignedStorageUrl } from "@/lib/storage";
 
@@ -7,6 +8,7 @@ type BeatRow = {
   title: string;
   produced_by?: string[] | null;
   producer_credits: string | null;
+  lease_price: number | null;
   bpm: number;
   key: string;
   tags: string[] | null;
@@ -51,6 +53,7 @@ async function mapBeat(row: BeatRow, supabase: NonNullable<ReturnType<typeof get
     id: row.id,
     slug: slugifyBeatTitle(row.title),
     title: row.title,
+    leasePrice: getBeatLeasePrice(row.lease_price),
     producedBy: Array.isArray(row.produced_by) ? row.produced_by : parseProducedBy(row.producer_credits),
     bpm: row.bpm,
     key: row.key,

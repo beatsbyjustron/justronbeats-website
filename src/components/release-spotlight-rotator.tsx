@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -19,6 +19,8 @@ type ReleaseSpotlightRotatorProps = {
   btsUrl: string;
 };
 
+const SLIDE_INDEXES = [0, 1] as const;
+
 export function ReleaseSpotlightRotator({
   coverUrl,
   releaseTitle,
@@ -36,8 +38,6 @@ export function ReleaseSpotlightRotator({
     return () => window.clearInterval(interval);
   }, []);
 
-  const isReleaseSlide = activeIndex === 0;
-  const coverAlt = isReleaseSlide ? `${releaseTitle} cover art` : `${releaseTitle} — behind the scenes`;
   const primaryHref = releaseLinks[0]?.href;
 
   const spotlightGlow = [
@@ -53,20 +53,28 @@ export function ReleaseSpotlightRotator({
       animate={{ boxShadow: [...spotlightGlow] }}
       transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
     >
-      <AnimatePresence mode="wait" initial={false}>
+      <div className="grid">
+        {SLIDE_INDEXES.map((slideIndex) => {
+          const slideIsRelease = slideIndex === 0;
+          const isActive = activeIndex === slideIndex;
+          const slideCoverAlt = slideIsRelease ? `${releaseTitle} cover art` : `${releaseTitle} - behind the scenes`;
+
+          return (
         <motion.div
-          key={activeIndex}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
+          key={slideIndex}
+          aria-hidden={!isActive}
+          initial={false}
+          animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
           transition={{ duration: 0.45, ease: "easeOut" }}
-          className="relative flex flex-col items-center gap-8 text-center lg:flex-row lg:items-stretch lg:gap-10 lg:text-left"
+          className={`relative col-start-1 row-start-1 flex flex-col items-center gap-8 text-center lg:flex-row lg:items-stretch lg:gap-10 lg:text-left ${
+            isActive ? "z-10" : "pointer-events-none z-0"
+          }`}
         >
           <div className="relative shrink-0">
             {coverUrl ? (
               <img
                 src={coverUrl}
-                alt={coverAlt}
+                alt={slideCoverAlt}
                 className="h-44 w-44 rounded-xl border border-lime-200/30 object-cover shadow-lg sm:h-56 sm:w-56"
               />
             ) : (
@@ -81,7 +89,7 @@ export function ReleaseSpotlightRotator({
 
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-4">
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start">
-              {isReleaseSlide ? (
+              {slideIsRelease ? (
                 <>
                   <span className="inline-flex items-center rounded-full border border-lime-200/50 bg-lime-300/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-lime-100">
                     Out now
@@ -98,7 +106,7 @@ export function ReleaseSpotlightRotator({
             </div>
 
             <div className="space-y-2">
-              {isReleaseSlide ? (
+              {slideIsRelease ? (
                 <>
                   <h2 className="text-balance text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl lg:text-[2.35rem] lg:leading-tight">
                     {releaseTitle}
@@ -124,13 +132,14 @@ export function ReleaseSpotlightRotator({
             </div>
 
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center lg:justify-start">
-              {isReleaseSlide ? (
+              {slideIsRelease ? (
                 <>
                   {primaryHref ? (
                     <a
                       href={primaryHref}
                       target="_blank"
                       rel="noopener noreferrer"
+                      tabIndex={isActive ? undefined : -1}
                       className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-lime-300 px-8 text-base font-bold text-zinc-950 shadow-[0_0_32px_-4px_rgba(190,242,100,0.55)] transition hover:bg-lime-200 hover:shadow-[0_0_40px_-2px_rgba(217,249,157,0.65)]"
                     >
                       Listen on {releaseLinks[0].label}
@@ -138,6 +147,7 @@ export function ReleaseSpotlightRotator({
                   ) : (
                     <Link
                       href="/productions"
+                      tabIndex={isActive ? undefined : -1}
                       className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-lime-300 px-8 text-base font-bold text-zinc-950 shadow-[0_0_32px_-4px_rgba(190,242,100,0.55)] transition hover:bg-lime-200"
                     >
                       View productions
@@ -152,6 +162,7 @@ export function ReleaseSpotlightRotator({
                           href={link.href}
                           target="_blank"
                           rel="noopener noreferrer"
+                          tabIndex={isActive ? undefined : -1}
                           className="inline-flex items-center justify-center rounded-full border border-lime-200/45 bg-zinc-950/50 px-4 py-2.5 text-xs font-semibold text-lime-50 backdrop-blur-sm transition hover:border-lime-200/80 hover:bg-zinc-900/80"
                         >
                           {link.label}
@@ -165,6 +176,7 @@ export function ReleaseSpotlightRotator({
                   href={btsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  tabIndex={isActive ? undefined : -1}
                   className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-lime-300 px-8 text-base font-bold text-zinc-950 shadow-[0_0_32px_-4px_rgba(190,242,100,0.55)] transition hover:bg-lime-200"
                 >
                   Watch on YouTube
@@ -173,7 +185,9 @@ export function ReleaseSpotlightRotator({
             </div>
           </div>
         </motion.div>
-      </AnimatePresence>
+          );
+        })}
+      </div>
     </motion.section>
   );
 }

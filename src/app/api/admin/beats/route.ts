@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { Database } from "@/types/database";
 import { parseStorageReference } from "@/lib/storage";
+import { BASE_BEAT_LEASE_PRICE, getBeatLeasePrice } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("beats")
-    .select("id, title, producer_credits, key, bpm, tags, featured, cover_art_url, created_at")
+    .select("id, title, producer_credits, key, bpm, tags, featured, lease_price, cover_art_url, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -92,6 +93,7 @@ export async function PATCH(request: Request) {
       bpm?: number;
       tags?: string[];
       featured?: boolean;
+      leasePrice?: number;
       coverArtPath?: string | null;
     };
 
@@ -133,6 +135,7 @@ export async function PATCH(request: Request) {
             .filter(Boolean)
         : [],
       featured: Boolean(body.featured),
+      lease_price: getBeatLeasePrice(body.leasePrice),
       ...(nextCoverArtPath !== undefined ? { cover_art_url: nextCoverArtPath } : {})
     };
 
@@ -208,6 +211,7 @@ export async function POST(request: Request) {
     const bpm = Number.isFinite(parsedBpm) && parsedBpm > 0 ? parsedBpm : 0;
     const tags = parseTagsInput(String(formData.get("tags") ?? ""));
     const featured = String(formData.get("featured") ?? "false") === "true";
+    const leasePrice = getBeatLeasePrice(Number(formData.get("leasePrice") ?? BASE_BEAT_LEASE_PRICE));
 
     const providedCoverArtUrl = String(formData.get("coverArtUrl") ?? "").trim();
     const providedMp3Url = String(formData.get("mp3Url") ?? "").trim();
@@ -258,7 +262,7 @@ export async function POST(request: Request) {
       wav_url: wavUrl,
       stems_url: stemsUrl,
       featured,
-      lease_price: 30,
+      lease_price: leasePrice,
       lease_terms:
         "Tagged MP3 file. Sell up to 2,500 units. 50,000 audio streams. Singles, albums, and streaming. Justron maintains ownership. Must give credit (prod. justron).",
       premium_price: null,

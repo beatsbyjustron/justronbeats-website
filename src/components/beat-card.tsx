@@ -6,6 +6,7 @@ import { SuggestedBeatLink } from "@/components/suggested-beat-link";
 import { Beat } from "@/components/types";
 import { useRouter } from "next/navigation";
 import { useSignedStorageUrl } from "@/components/use-signed-storage-url";
+import { formatUsd, getBeatLeasePriceCents } from "@/lib/pricing";
 
 type BeatCardProps = {
   beat: Beat;
@@ -41,6 +42,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
   const [showCopied, setShowCopied] = useState(false);
   const [showLicenseTerms, setShowLicenseTerms] = useState(false);
   const signedCoverArtUrl = useSignedStorageUrl(beat.coverArtUrl);
+  const leasePriceLabel = formatUsd(beat.leasePrice);
 
   const submitOffer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -81,7 +83,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
           beatId: beat.id,
           title: beat.title,
           image: beat.coverArtUrl,
-          priceCents: 3000
+          priceCents: getBeatLeasePriceCents(beat.leasePrice)
         })
       });
 
@@ -201,7 +203,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
           disabled={isStartingCheckout}
           className="rounded-full bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300 px-5 py-2.5 text-sm font-bold text-zinc-900 shadow-lg shadow-emerald-500/30 transition hover:scale-[1.02]"
         >
-          {isStartingCheckout ? "Starting checkout..." : "Lease $30"}
+          {isStartingCheckout ? "Starting checkout..." : `Lease ${leasePriceLabel}`}
         </button>
         <button
           type="button"

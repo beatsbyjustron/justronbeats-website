@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AnalyzeResponse } from "@/lib/audio-analysis-contract";
+import { BASE_BEAT_LEASE_PRICE } from "@/lib/pricing";
 import { CarouselArtistsAdmin } from "./carousel-artists-admin";
 
 type Status = {
@@ -23,6 +24,7 @@ type AdminBeat = {
   bpm: number;
   tags: string[];
   featured: boolean;
+  lease_price: number | null;
   cover_art_url: string | null;
 };
 type AdminProduction = {
@@ -67,6 +69,7 @@ const initialUploadForm = {
   key: "",
   bpm: "",
   tags: "",
+  leasePrice: String(BASE_BEAT_LEASE_PRICE),
   featured: false
 };
 const initialProductionForm = {
@@ -175,6 +178,7 @@ export default function AdminUploadPage() {
     key: "",
     bpm: "",
     tags: "",
+    leasePrice: String(BASE_BEAT_LEASE_PRICE),
     featured: false
   });
   const [editStatus, setEditStatus] = useState<Status>(initialStatus);
@@ -608,6 +612,7 @@ export default function AdminUploadPage() {
       formData.set("key", uploadForm.key.trim());
       formData.set("bpm", uploadForm.bpm.trim());
       formData.set("tags", uploadForm.tags.trim());
+      formData.set("leasePrice", uploadForm.leasePrice.trim());
       formData.set("featured", uploadForm.featured ? "true" : "false");
       formData.set("coverArtUrl", coverArtUrl);
       formData.set("mp3Url", mp3Url);
@@ -971,6 +976,7 @@ export default function AdminUploadPage() {
       key: beat.key === "Unknown" ? "" : beat.key,
       bpm: beat.bpm ? String(beat.bpm) : "",
       tags: beat.tags.join(", "),
+      leasePrice: String(beat.lease_price ?? BASE_BEAT_LEASE_PRICE),
       featured: beat.featured
     });
     const currentCoverPath = String(beat.cover_art_url ?? "").trim();
@@ -1013,6 +1019,7 @@ export default function AdminUploadPage() {
           tags: editForm.tags
             ? parseTagsInput(editForm.tags)
             : [],
+          leasePrice: Number(editForm.leasePrice || BASE_BEAT_LEASE_PRICE),
           featured: editForm.featured,
           coverArtPath: nextCoverPath || null
         })
@@ -1219,6 +1226,18 @@ export default function AdminUploadPage() {
           placeholder="Tags (comma separated, e.g. lil uzi vert, osamason, drill)"
           value={uploadForm.tags}
           onChange={(event) => setUploadForm((prev) => ({ ...prev, tags: event.target.value }))}
+          className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
+        />
+        <input
+          name="jr-beat-lease-price"
+          autoComplete="off"
+          type="number"
+          min={1}
+          step={0.01}
+          inputMode="decimal"
+          placeholder={`Lease price USD (default ${BASE_BEAT_LEASE_PRICE})`}
+          value={uploadForm.leasePrice}
+          onChange={(event) => setUploadForm((prev) => ({ ...prev, leasePrice: event.target.value }))}
           className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
         />
 
@@ -1485,6 +1504,16 @@ export default function AdminUploadPage() {
                       placeholder="Tags (comma separated)"
                       className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
                     />
+                    <input
+                      type="number"
+                      min={1}
+                      step={0.01}
+                      inputMode="decimal"
+                      value={editForm.leasePrice}
+                      onChange={(event) => setEditForm((prev) => ({ ...prev, leasePrice: event.target.value }))}
+                      placeholder="Lease price USD"
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
+                    />
                     <label className="flex items-center gap-2 text-sm text-zinc-300">
                       <input
                         type="checkbox"
@@ -1551,6 +1580,9 @@ export default function AdminUploadPage() {
                       <p className="text-xs text-zinc-400">{beat.producer_credits || "No collaborators listed"}</p>
                       <p className="text-xs text-zinc-500">
                         {beat.bpm || 0} BPM • {beat.key || "Unknown"}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        Lease: {formatUsd(Number(beat.lease_price ?? BASE_BEAT_LEASE_PRICE))}
                       </p>
                       <p className="text-xs text-zinc-500">{beat.tags.length ? beat.tags.join(", ") : "No tags"}</p>
                       {beat.featured && <p className="text-xs text-emerald-400">Featured</p>}

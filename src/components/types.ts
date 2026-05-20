@@ -2,6 +2,7 @@ export type Beat = {
   id: string;
   slug: string;
   title: string;
+  leasePrice: number;
   bpm: number;
   key: string;
   producedBy: string[];

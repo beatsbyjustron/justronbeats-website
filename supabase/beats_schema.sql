@@ -11,7 +11,7 @@ create table if not exists public.beats (
   wav_url text,
   stems_url text,
   featured boolean not null default false,
-  lease_price numeric,
+  lease_price numeric default 40,
   lease_terms text,
   premium_price numeric,
   premium_terms text,
@@ -20,6 +20,9 @@ create table if not exists public.beats (
 );
 
 create index if not exists beats_tags_gin_idx on public.beats using gin (tags);
+
+alter table public.beats alter column lease_price set default 40;
+update public.beats set lease_price = 40 where lease_price is null or lease_price = 30;
 
 create table if not exists public.beat_offers (
   id uuid primary key default gen_random_uuid(),

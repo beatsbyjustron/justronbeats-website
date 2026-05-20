@@ -7,6 +7,7 @@ import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
 import { useSignedStorageUrl } from "@/components/use-signed-storage-url";
 import { getRelatedBeats } from "@/lib/related-beats";
+import { formatUsd, getBeatLeasePriceCents } from "@/lib/pricing";
 
 type BeatDetailContentProps = {
   beat: Beat;
@@ -38,6 +39,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
   const [checkoutError, setCheckoutError] = useState("");
   const [showLicenseTerms, setShowLicenseTerms] = useState(false);
   const signedCoverArtUrl = useSignedStorageUrl(beat.coverArtUrl);
+  const leasePriceLabel = formatUsd(beat.leasePrice);
 
   const relatedBeats = useMemo(
     () => (queueBeats?.length ? getRelatedBeats(beat, queueBeats, 3) : []),
@@ -88,7 +90,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
           beatId: beat.id,
           title: beat.title,
           image: beat.coverArtUrl,
-          priceCents: 3000
+          priceCents: getBeatLeasePriceCents(beat.leasePrice)
         })
       });
 
@@ -143,7 +145,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
           disabled={isStartingCheckout}
           className="rounded-full bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300 px-5 py-2.5 text-sm font-bold text-zinc-900 shadow-lg shadow-emerald-500/30 transition hover:scale-[1.02]"
         >
-          {isStartingCheckout ? "Starting checkout..." : "Lease $30"}
+          {isStartingCheckout ? "Starting checkout..." : `Lease ${leasePriceLabel}`}
         </button>
         <button
           type="button"
