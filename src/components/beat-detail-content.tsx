@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Beat } from "@/components/types";
 import { SuggestedBeatLink } from "@/components/suggested-beat-link";
+import { FavoriteButton } from "@/components/favorite-button";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
 import { useSignedStorageUrl } from "@/components/use-signed-storage-url";
@@ -154,6 +155,7 @@ export function BeatDetailContent({ beat, queueBeats }: BeatDetailContentProps) 
         >
           Exclusive - Make an Offer
         </button>
+        <FavoriteButton beatId={beat.id} withLabel />
         <button
           type="button"
           onClick={() => setShowLicenseTerms((prev) => !prev)}

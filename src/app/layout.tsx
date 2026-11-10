@@ -5,6 +5,8 @@ import { TsparticlesBackground } from "@/components/tsparticles-background";
 import { GlobalAudioPlayerProvider } from "@/components/global-audio-player-provider";
 import "./globals.css";
 import { TanksNavLink } from "@/components/tanks-nav-link";
+import { AuthProvider } from "@/components/auth-provider";
+import { AccountNavLink } from "@/components/account-nav-link";
 
 export const metadata: Metadata = {
   title: "Justron Beats",
@@ -91,6 +93,7 @@ export default function RootLayout({
       <body className="relative isolate overflow-x-hidden bg-black">
         <PosthogProvider>
           <GlobalAudioPlayerProvider>
+          <AuthProvider>
             <TsparticlesBackground />
             <div className="relative z-10 mx-auto min-h-screen w-full max-w-6xl min-w-0 px-4 pb-28 pt-8 sm:px-6">
               <header className="relative z-20 -mx-4 mb-12 flex flex-col gap-6 border-b border-zinc-800 bg-black px-4 pb-6 sm:-mx-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4 sm:px-6">
@@ -111,6 +114,7 @@ export default function RootLayout({
                     </Link>
                   ))}
                   <TanksNavLink className="rounded-full bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300 bg-clip-text px-2.5 py-1.5 font-semibold text-transparent transition hover:bg-zinc-900 sm:px-3" />
+                  <AccountNavLink className="rounded-full border border-zinc-700 px-2.5 py-1.5 text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900 sm:px-3" />
                   <div className="flex shrink-0 items-center gap-2 sm:ml-1">
                     <a
                       href="https://www.instagram.com/justronbeats"
@@ -186,6 +190,7 @@ export default function RootLayout({
                 </div>
               </footer>
             </div>
+          </AuthProvider>
           </GlobalAudioPlayerProvider>
         </PosthogProvider>
       </body>
