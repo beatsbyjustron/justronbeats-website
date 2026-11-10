@@ -4,6 +4,7 @@ import { PosthogProvider } from "@/components/posthog-provider";
 import { TsparticlesBackground } from "@/components/tsparticles-background";
 import { GlobalAudioPlayerProvider } from "@/components/global-audio-player-provider";
 import "./globals.css";
+import { TanksNavLink } from "@/components/tanks-nav-link";
 
 export const metadata: Metadata = {
   title: "Justron Beats",
@@ -109,12 +110,7 @@ export default function RootLayout({
                       {item.label}
                     </Link>
                   ))}
-                  <a
-                    href="/tanks"
-                    className="rounded-full px-2.5 py-1.5 text-amber-300 transition hover:bg-zinc-900 hover:text-amber-200 sm:px-3"
-                  >
-                    Tanks
-                  </a>
+                  <TanksNavLink className="rounded-full bg-gradient-to-r from-emerald-400 via-lime-300 to-yellow-300 bg-clip-text px-2.5 py-1.5 font-semibold text-transparent transition hover:bg-zinc-900 sm:px-3" />
                   <div className="flex shrink-0 items-center gap-2 sm:ml-1">
                     <a
                       href="https://www.instagram.com/justronbeats"
