@@ -20,3 +20,6 @@ create index if not exists tank_scores_week_idx on public.tank_scores (week, cle
 
 alter table public.players enable row level security;
 alter table public.tank_scores enable row level security;
+
+-- Choose which beats play in Justron Tanks (all on by default).
+alter table public.beats add column if not exists in_tanks boolean not null default true;

@@ -116,6 +116,7 @@ export default function AdminUploadPage() {
   const [activeTab, setActiveTab] = useState<"beats" | "productions" | "drumKits" | "artists" | "sales">("beats");
   const [gatePassword, setGatePassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [inTanks, setInTanks] = useState<Record<string, boolean> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<Status>(initialStatus);
   const [formPassword, setFormPassword] = useState("");
@@ -234,6 +235,17 @@ export default function AdminUploadPage() {
     };
   }, []);
 
+  const toggleInTanks = async (beatId: string) => {
+    const next = !(inTanks?.[beatId] ?? true);
+    setInTanks((prev) => ({ ...(prev ?? {}), [beatId]: next }));
+    const res = await fetch("/api/admin/tanks-beats", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-admin-password": gatePassword || formPassword },
+      body: JSON.stringify({ id: beatId, inTanks: next })
+    }).catch(() => null);
+    if (!res || !res.ok) setInTanks((prev) => ({ ...(prev ?? {}), [beatId]: !next }));
+  };
+
   const loadBeats = async () => {
     setIsLoadingBeats(true);
     setEditStatus(initialStatus);
@@ -255,6 +267,10 @@ export default function AdminUploadPage() {
 
       setBeats(result.beats ?? []);
       setIsLoadingBeats(false);
+      void fetch("/api/admin/tanks-beats", { headers: { "x-admin-password": password } })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { available?: boolean; inTanks?: Record<string, boolean> } | null) => setInTanks(data?.available ? data.inTanks ?? {} : null))
+        .catch(() => setInTanks(null));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to fetch beats.";
       setEditStatus({ type: "error", message });
@@ -1581,6 +1597,21 @@ export default function AdminUploadPage() {
                       {beat.featured && <p className="text-xs text-emerald-400">Featured</p>}
                     </div>
                     <div className="flex items-center gap-2">
+                      {inTanks && (
+                        <button
+                          type="button"
+                          onClick={() => void toggleInTanks(beat.id)}
+                          aria-pressed={inTanks[beat.id] ?? true}
+                          title="Play this beat in Justron Tanks"
+                          className={`rounded-full border px-4 py-2 text-xs transition ${
+                            inTanks[beat.id] ?? true
+                              ? "border-lime-300/60 text-lime-200 hover:bg-lime-300/10"
+                              : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
+                          }`}
+                        >
+                          {inTanks[beat.id] ?? true ? "In Tanks ✓" : "Not in Tanks"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => beginEdit(beat)}
