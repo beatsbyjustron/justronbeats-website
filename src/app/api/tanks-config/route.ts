@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-// Public Supabase settings for Justron Tanks duos (Realtime broadcast only).
-// The anon key is already public in the site's client bundle.
+// Public settings for Justron Tanks: Supabase (duos) and PostHog (analytics).
+// All of these are already public in the site's client bundle.
 export const dynamic = "force-dynamic";
 
 export function GET() {
@@ -10,5 +10,7 @@ export function GET() {
   if (!url || !key) {
     return NextResponse.json({ error: "Duos are not configured." }, { status: 503 });
   }
-  return NextResponse.json({ url, key }, { headers: { "Cache-Control": "public, max-age=300" } });
+  const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() || null;
+  const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim() || "https://us.i.posthog.com";
+  return NextResponse.json({ url, key, posthogKey, posthogHost }, { headers: { "Cache-Control": "public, max-age=300" } });
 }
