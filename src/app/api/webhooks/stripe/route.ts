@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSignedUrlExpirySeconds, parseStorageReference } from "@/lib/storage";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -76,6 +77,25 @@ export async function POST(request: Request) {
     const supabase = getSupabaseServerClient();
     if (!supabase) {
       return NextResponse.json({ error: "Supabase env configuration missing" }, { status: 500 });
+    }
+
+    // Record the purchase so it shows up on the buyer's account page.
+    const admin = getAdminClient();
+    if (admin) {
+      const { error: purchaseError } = await admin.from("purchases").upsert(
+        {
+          stripe_session_id: session.id,
+          email: customerEmail.toLowerCase(),
+          item_type: itemType,
+          beat_id: itemType === "beat" ? beatId || null : null,
+          drum_kit_id: itemType === "drum_kit" ? drumKitId || null : null,
+          amount_cents: session.amount_total ?? null,
+          currency: session.currency ?? null,
+          created_at: new Date(session.created * 1000).toISOString()
+        },
+        { onConflict: "stripe_session_id", ignoreDuplicates: true }
+      );
+      if (purchaseError) console.error("stripe webhook: record purchase", purchaseError.message);
     }
 
     let downloadUrl = "";

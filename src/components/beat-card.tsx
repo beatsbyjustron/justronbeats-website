@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, MouseEvent, useState } from "react";
+import { FavoriteButton } from "@/components/favorite-button";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import { SuggestedBeatLink } from "@/components/suggested-beat-link";
 import { Beat } from "@/components/types";
@@ -126,7 +127,8 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
       className="relative max-w-full min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 p-4 transition hover:border-zinc-700 sm:p-5"
       onClick={onCardClick}
     >
-      <div className="absolute right-3 top-3">
+      <div className="absolute right-3 top-3 flex items-start gap-2">
+        <FavoriteButton beatId={beat.id} />
         <button
           type="button"
           onClick={copyBeatLink}
@@ -162,7 +164,7 @@ export function BeatCard({ beat, isExpanded, onToggle, suggestions, onTagClick }
             aria-hidden="true"
           />
         )}
-        <div className="min-w-0 flex-1 pr-10">
+        <div className="min-w-0 flex-1 pr-20">
           <h3 className="break-words text-base font-semibold leading-snug text-zinc-100 sm:text-lg">{beat.title}</h3>
           <p className="break-words text-sm text-zinc-400">{formatProducerLine(beat.producedBy)}</p>
           <p className="text-xs text-zinc-500">
