@@ -278,7 +278,7 @@ export function AccountContent() {
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-lime-300/30 bg-lime-300/[0.06] p-5">
         <div>
           <p className="font-semibold text-zinc-100">Play Justron Tanks</p>
-          <p className="text-sm text-zinc-400">5 worlds, 25 missions, each one on a Justron beat. Bring a friend for duos.</p>
+          <p className="text-sm text-zinc-400">10 worlds, 50 missions, each one on a Justron beat. Bring a friend for duos.</p>
         </div>
         <TanksNavLink className="rounded-full bg-lime-300 px-5 py-2.5 text-sm font-bold text-zinc-950 transition hover:bg-lime-200">Play now</TanksNavLink>
       </section>
