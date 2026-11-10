@@ -1085,12 +1085,15 @@ export default function AdminUploadPage() {
       <main className="mx-auto max-w-md space-y-6">
         <h1 className="text-3xl font-semibold text-zinc-100">Admin Upload</h1>
         <form onSubmit={unlock} className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+          {/* Lets the browser save this as the "admin" login instead of guessing a username from other fields */}
+          <input type="text" name="username" value="admin" autoComplete="username" readOnly hidden />
           <label htmlFor="gatePassword" className="block text-sm text-zinc-400">
             Password
           </label>
           <input
             id="gatePassword"
             type="password"
+            autoComplete="current-password"
             value={gatePassword}
             onChange={(event) => setGatePassword(event.target.value)}
             className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none ring-zinc-500 focus:ring-2"
@@ -1359,16 +1362,6 @@ export default function AdminUploadPage() {
           />
           Mark beat as featured
         </label>
-
-        <input
-          name="password"
-          type="password"
-          value={formPassword}
-          onChange={(event) => setFormPassword(event.target.value)}
-          placeholder="Admin password to submit"
-          required
-          className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100"
-        />
 
         <button
           type="submit"
