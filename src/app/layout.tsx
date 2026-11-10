@@ -109,6 +109,12 @@ export default function RootLayout({
                       {item.label}
                     </Link>
                   ))}
+                  <a
+                    href="/tanks"
+                    className="rounded-full px-2.5 py-1.5 text-amber-300 transition hover:bg-zinc-900 hover:text-amber-200 sm:px-3"
+                  >
+                    Tanks
+                  </a>
                   <div className="flex shrink-0 items-center gap-2 sm:ml-1">
                     <a
                       href="https://www.instagram.com/justronbeats"
