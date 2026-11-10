@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Justron Tanks</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Cdefs%3E%3ClinearGradient id="fv" x1="0" y1="0" x2="1" y2="1"%3E%3Cstop offset="0" stop-color="#34d399"/%3E%3Cstop offset=".55" stop-color="#bef264"/%3E%3Cstop offset="1" stop-color="#fde047"/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d="M50 4 V22 M50 78 V96 M4 50 H22 M78 50 H96" stroke="url(#fv)" stroke-width="6" stroke-linecap="round"/%3E%3Ccircle cx="50" cy="50" r="31" fill="#111114"/%3E%3Ccircle cx="50" cy="50" r="27" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/%3E%3Ccircle cx="50" cy="50" r="23.5" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/%3E%3Ccircle cx="50" cy="50" r="20" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/%3E%3Ccircle cx="50" cy="50" r="34" fill="none" stroke="url(#fv)" stroke-width="6"/%3E%3Ccircle cx="50" cy="50" r="14" fill="url(#fv)"/%3E%3Cpath d="M54.5 41 V52.5 A5.2 5.2 0 0 1 44 52.5" fill="none" stroke="#0a0a0a" stroke-width="4.6" stroke-linecap="round"/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&display=swap">
 <style>
   :root{--bg:#000;--panel:#09090b;--panel2:#18181b;--line:#27272a;--line2:#3f3f46;--txt:#f4f4f5;--muted:#a1a1aa;--dim:#71717a;
         --grad:linear-gradient(90deg,#34d399,#bef264,#fde047);--em:#34d399}
@@ -59,8 +61,15 @@
   .link{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#000;border:1px solid var(--line2);border-radius:12px;padding:10px 14px;margin:10px auto 4px;max-width:420px;word-break:break-all;color:var(--txt);user-select:all;-webkit-user-select:all}
   .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--em);margin-right:8px;animation:pl 1.2s infinite}
   @keyframes pl{0%,100%{opacity:.25}50%{opacity:1}}
+  .logo{display:flex;align-items:center;justify-content:center;gap:18px;margin:0 0 6px}
+  .logo svg{flex-shrink:0}
+  .logo .wm{font-family:'Chakra Petch',ui-sans-serif,system-ui,sans-serif;font-weight:700;font-size:40px;line-height:1;letter-spacing:.06em;color:var(--txt);text-align:left}
+  .logo .wm span{color:#bef264}
+  .logo .tl{font-family:'Chakra Petch',ui-sans-serif,system-ui,sans-serif;font-weight:600;font-size:11px;letter-spacing:.5em;color:var(--muted);margin-top:8px;text-align:left}
+  #splash .logo .wm{font-size:52px}
+  #splash .logo .tl{font-size:13px}
   #splash{position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s ease}
-  #splash .t{font-size:44px;font-weight:800;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;transition:transform .6s ease}
+  #splash .t{transition:transform .6s ease}
   #splash .s{font-size:12px;letter-spacing:.4em;text-transform:uppercase;color:var(--dim)}
   #splash.out{opacity:0;pointer-events:none}
   #splash.out .t{transform:scale(1.06)}
@@ -68,7 +77,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><div class="t">JUSTRON TANKS</div><div class="s">prod. justron</div></div>
+<div id="splash"><div class="t logo"><svg viewBox="0 0 100 100" width="110" height="110" aria-hidden="true"><defs><linearGradient id="sp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset=".55" stop-color="#bef264"/><stop offset="1" stop-color="#fde047"/></linearGradient></defs><path d="M50 4 V22 M50 78 V96 M4 50 H22 M78 50 H96" stroke="url(#sp)" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="50" r="31" fill="#111114"/><circle cx="50" cy="50" r="27" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="23.5" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="20" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="34" fill="none" stroke="url(#sp)" stroke-width="6"/><circle cx="50" cy="50" r="14" fill="url(#sp)"/><path d="M54.5 41 V52.5 A5.2 5.2 0 0 1 44 52.5" fill="none" stroke="#0a0a0a" stroke-width="4.6" stroke-linecap="round"/></svg><div><div class="wm">JUSTRON <span>TANKS</span></div><div class="tl">PLAY TO THE BEAT</div></div></div></div>
 <div id="wrap">
   <div id="hud">
     <span>Mission<b id="hMission">1</b></span>
@@ -167,6 +176,7 @@ const TYPES = {
   k:{name:'Shadow', color:'#26262b', speed:130, turn:4.0, cd:0.7, shell:360, bounces:0, max:2, aim:'direct', err:0.03,  dodge:1,   keep:60,  mines:2, pts:8, rocket:true, lead:true},
 };
 const PLAYER_SPEED = 118;
+const LOGO_MARK = '<svg viewBox="0 0 100 100" width="84" height="84" aria-hidden="true"><defs><linearGradient id="tm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset=".55" stop-color="#bef264"/><stop offset="1" stop-color="#fde047"/></linearGradient></defs><path d="M50 4 V22 M50 78 V96 M4 50 H22 M78 50 H96" stroke="url(#tm)" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="50" r="31" fill="#111114"/><circle cx="50" cy="50" r="27" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="23.5" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="20" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="34" fill="none" stroke="url(#tm)" stroke-width="6"/><circle cx="50" cy="50" r="14" fill="url(#tm)"/><path d="M54.5 41 V52.5 A5.2 5.2 0 0 1 44 52.5" fill="none" stroke="#0a0a0a" stroke-width="4.6" stroke-linecap="round"/></svg>';
 
 // ---------- DOM / canvas ----------
 const canvas = document.getElementById('c');
@@ -910,8 +920,7 @@ function renderOverlay() {
   let html = '';
   if (state === 'title') {
     html = `<div class="panel">
-      <h1>${esc(BRAND.name)}</h1>
-      <div class="tag">${esc(BRAND.tag)}</div>
+      <h1 class="logo" aria-label="${esc(BRAND.name)}">${LOGO_MARK}<span><span class="wm" style="display:block">JUSTRON <span>TANKS</span></span><span class="tl" style="display:block">PLAY TO THE BEAT</span></span></h1>
       <p>${WORLDS.length} worlds. ${LEVELS.length} missions. ${catalog ? 'Every mission drops a random Justron beat from the store. Hear one you like? Save it or license it right from the game.' : 'Every world runs on a different Justron beat.'}</p>
       <p class="small">Your shells bounce once, so use the walls.</p>
       <div class="controls">

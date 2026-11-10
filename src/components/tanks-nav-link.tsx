@@ -2,14 +2,14 @@
 
 import { useEffect, type MouseEvent, type ReactNode } from "react";
 
-const GRADIENT = "linear-gradient(90deg,#34d399,#bef264,#fde047)";
+const LOGO = "/tanks/brand/lockup-transparent.png";
 
 function makeCurtain(visible: boolean) {
   const el = document.createElement("div");
   el.dataset.jtCurtain = "1";
   el.setAttribute("aria-hidden", "true");
   el.style.cssText = `position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .5s ease;opacity:${visible ? 1 : 0}`;
-  el.innerHTML = `<div style="font:800 44px/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.04em;background:${GRADIENT};-webkit-background-clip:text;background-clip:text;color:transparent;transition:transform .5s ease,opacity .5s ease;transform:scale(${visible ? 1 : 0.94});opacity:${visible ? 1 : 0}">JUSTRON TANKS</div><div style="font:500 12px ui-sans-serif,system-ui,sans-serif;letter-spacing:.4em;text-transform:uppercase;color:#71717a">prod. justron</div>`;
+  el.innerHTML = `<img src="${LOGO}" alt="" style="width:min(560px,80vw);height:auto;transition:transform .5s ease,opacity .5s ease;transform:scale(${visible ? 1 : 0.94});opacity:${visible ? 1 : 0}">`;
   document.body.appendChild(el);
   return el;
 }
@@ -33,6 +33,9 @@ export function TanksNavLink({
     prefetch.rel = "prefetch";
     prefetch.href = "/tanks/index.html";
     document.head.appendChild(prefetch);
+    // Load the logo now so the fade into the game shows it right away.
+    const logo = new Image();
+    logo.src = LOGO;
 
     // Coming back from the game: fade the store in from the black title card.
     let exitAt = 0;
