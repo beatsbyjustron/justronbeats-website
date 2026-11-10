@@ -13,8 +13,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { email?: string };
+    const body = (await request.json()) as { email?: string; source?: string };
     const email = String(body.email ?? "").trim().toLowerCase();
+    const source = body.source === "justron-tanks" ? "justron-tanks" : "justronbeats-website";
     if (!isValidEmail(email)) {
       return NextResponse.json({ error: "Please provide a valid email address." }, { status: 400 });
     }
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email,
-        source: "justronbeats-website",
+        source,
         submittedAt: new Date().toISOString()
       })
     });
