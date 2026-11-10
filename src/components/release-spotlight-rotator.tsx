@@ -20,7 +20,7 @@ type ReleaseSpotlightRotatorProps = {
   btsUrl: string;
 };
 
-// 0 = newest release, 1 = Justron Tanks, 2 = behind the scenes
+// 0 = Justron Tanks, 1 = newest release, 2 = behind the scenes
 const SLIDE_INDEXES = [0, 1, 2] as const;
 const TANKS_COVER = "/tanks/cover.jpg";
 
@@ -37,7 +37,7 @@ export function ReleaseSpotlightRotator({
   // bumped on every manual jump so the auto-advance timer starts over
   const [timerKey, setTimerKey] = useState(0);
   const slideCount = SLIDE_INDEXES.length;
-  const slideLabels = [releaseTitle || "Newest release", "Justron Tanks", "Behind the scenes"];
+  const slideLabels = ["Justron Tanks", releaseTitle || "Newest release", "Behind the scenes"];
 
   useEffect(() => {
     if (paused) return;
@@ -74,8 +74,8 @@ export function ReleaseSpotlightRotator({
     >
       <div className="grid">
         {SLIDE_INDEXES.map((slideIndex) => {
-          const slideIsRelease = slideIndex === 0;
-          const slideIsTanks = slideIndex === 1;
+          const slideIsTanks = slideIndex === 0;
+          const slideIsRelease = slideIndex === 1;
           const isActive = activeIndex === slideIndex;
           const slideCoverAlt = slideIsTanks
             ? "Justron Tanks gameplay"
