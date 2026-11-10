@@ -83,13 +83,13 @@ const BRAND = {
   playerColor: '#3b7dd8',
 };
 // One beat per world (5 missions each). Put the MP3s in the beats/ folder next to this file.
-// link = the beat's page on your store. code = the discount code unlocked by clearing that world.
+// link = the beat's page on your store. code = the discount code unlocked by clearing that world (leave '' to hide it).
 const WORLDS = [
-  { beat: 'Beat Name 1', file: 'beats/world1.mp3', link: 'https://justronbeats.com', code: 'TANKS10' },
-  { beat: 'Beat Name 2', file: 'beats/world2.mp3', link: 'https://justronbeats.com', code: 'TANKS15' },
-  { beat: 'Beat Name 3', file: 'beats/world3.mp3', link: 'https://justronbeats.com', code: 'TANKS20' },
-  { beat: 'Beat Name 4', file: 'beats/world4.mp3', link: 'https://justronbeats.com', code: 'TANKS25' },
-  { beat: 'Beat Name 5', file: 'beats/world5.mp3', link: 'https://justronbeats.com', code: 'TANKS30' },
+  { beat: 'Mascara',    prod: 'prod. justron',             file: 'beats/world1.mp3', link: 'https://justronbeats.com', code: '' },
+  { beat: 'Really You', prod: 'prod. justron',             file: 'beats/world2.mp3', link: 'https://justronbeats.com', code: '' },
+  { beat: 'Drill Time', prod: 'prod. justron x ben baker', file: 'beats/world3.mp3', link: 'https://justronbeats.com', code: '' },
+  { beat: 'Drown',      prod: 'prod. justron',             file: 'beats/world4.mp3', link: 'https://justronbeats.com/beats/drown', code: '' },
+  { beat: 'Disturbia',  prod: 'prod. justron x thr6x',     file: 'beats/world5.mp3', link: 'https://justronbeats.com', code: '' },
 ];
 // Optional email capture. On justronbeats.com set endpoint to '/api/subscribe'.
 // (Or use Supabase directly: url + anonKey + table.) Leave both empty to hide the signup box.
@@ -483,7 +483,7 @@ function updateNowPlaying() {
   const w = curWorld(), on = !!(customBeat || worldBuf());
   const name = customBeat ? customName : w.beat;
   hud.np.style.display = 'block';
-  hud.np.innerHTML = `♪ ${on ? 'Now playing' : 'World ' + (worldOf(mission) + 1)}: <b>${esc(name)}</b> · ${esc(BRAND.tag)}${customBeat ? '' : ` · <a href="${esc(w.link)}" target="_blank" rel="noopener">License</a>`}`;
+  hud.np.innerHTML = `♪ ${on ? 'Now playing' : 'World ' + (worldOf(mission) + 1)}: <b>${esc(name)}</b> · ${esc(customBeat ? BRAND.tag : (w.prod || BRAND.tag))}${customBeat ? '' : ` · <a href="${esc(w.link)}" target="_blank" rel="noopener">License</a>`}`;
 }
 let unlocked = [];
 try { unlocked = JSON.parse(localStorage.getItem('jt_codes') || '[]'); } catch (e) { unlocked = []; }
@@ -722,12 +722,13 @@ function beatSection() {
 function beatCard(label) {
   if (customBeat) return '';
   const w = curWorld();
-  return `<div class="card">${label || 'World ' + (worldOf(mission) + 1) + ' soundtrack'}<div class="bn">♪ ${esc(w.beat)}</div>
+  return `<div class="card">${label || 'World ' + (worldOf(mission) + 1) + ' soundtrack'}<div class="bn">♪ ${esc(w.beat)}</div><div class="small" style="margin:-6px 0 8px">${esc(w.prod || BRAND.tag)}</div>
     <a class="lic" href="${esc(w.link)}" target="_blank" rel="noopener">License this beat · ${esc(BRAND.leasePrice)} lease</a></div>`;
 }
 function codesList() {
-  if (!unlocked.length) return '';
-  return `<p class="small">Your unlocked codes: ${unlocked.slice().sort().map(i => `<b>${esc(WORLDS[i].code)}</b>`).join(' · ')} — use them at <a href="${esc(BRAND.store)}" target="_blank" rel="noopener">${esc(BRAND.store.replace(/^https?:\/\//, ''))}</a></p>`;
+  const real = unlocked.filter(i => WORLDS[i] && WORLDS[i].code);
+  if (!real.length) return '';
+  return `<p class="small">Your unlocked codes: ${real.slice().sort().map(i => `<b>${esc(WORLDS[i].code)}</b>`).join(' · ')} — use them at <a href="${esc(BRAND.store)}" target="_blank" rel="noopener">${esc(BRAND.store.replace(/^https?:\/\//, ''))}</a></p>`;
 }
 function signupBox() {
   if (!SIGNUP.endpoint && !SIGNUP.url) return '';
@@ -739,7 +740,7 @@ function renderOverlay() {
     html = `<div class="panel">
       <h1>${esc(BRAND.name)}</h1>
       <div class="tag">${esc(BRAND.tag)}</div>
-      <p>${WORLDS.length} worlds. ${LEVELS.length} missions. Every world runs on a different Justron beat, and clearing a world unlocks a discount code for the beat store.</p>
+      <p>${WORLDS.length} worlds. ${LEVELS.length} missions. Every world runs on a different Justron beat.</p>
       <p class="small">Your shells bounce once, so use the walls.</p>
       <div class="controls">
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows</span><span>Drive</span>
@@ -778,7 +779,7 @@ function renderOverlay() {
     html = `<div class="panel">
       <h2>${state === 'win' ? 'ALL MISSIONS CLEARED' : 'GAME OVER'}</h2>
       <div class="stats">${state === 'win' ? 'You beat every mission.' : `You reached mission ${reached}.`}<br>Tanks destroyed: <b>${kills}</b> &nbsp; Score: <b>${score}</b></div>
-      ${state === 'win' ? `<p>Final world unlocked:</p><div class="code">${esc(WORLDS[WORLDS.length - 1].code)}</div><div><button class="btn2" data-act="copy" data-code="${esc(WORLDS[WORLDS.length - 1].code)}">Copy code</button></div>` : ''}
+      ${state === 'win' && WORLDS[WORLDS.length - 1].code ? `<p>Final world unlocked:</p><div class="code">${esc(WORLDS[WORLDS.length - 1].code)}</div><div><button class="btn2" data-act="copy" data-code="${esc(WORLDS[WORLDS.length - 1].code)}">Copy code</button></div>` : ''}
       ${best ? `<p class="small">Best: mission ${best}</p>` : ''}
       ${beatCard(state === 'win' ? 'The beat you finished on' : 'The beat you went down to')}
       ${codesList()}
@@ -789,9 +790,9 @@ function renderOverlay() {
     const wi = worldOf(mission) - 1, w = WORLDS[wi];
     html = `<div class="panel">
       <h2>WORLD ${wi + 1} CLEARED</h2>
-      <p>You unlocked a discount code for <a href="${esc(BRAND.store)}" target="_blank" rel="noopener">${esc(BRAND.store.replace(/^https?:\/\//, ''))}</a>:</p>
+      ${w.code ? `<p>You unlocked a discount code for <a href="${esc(BRAND.store)}" target="_blank" rel="noopener">${esc(BRAND.store.replace(/^https?:\/\//, ''))}</a>:</p>
       <div class="code">${esc(w.code)}</div>
-      <div><button class="btn2" data-act="copy" data-code="${esc(w.code)}">Copy code</button></div>
+      <div><button class="btn2" data-act="copy" data-code="${esc(w.code)}">Copy code</button></div>` : ''}
       <div class="card">You just played to<div class="bn">♪ ${esc(w.beat)}</div><a class="lic" href="${esc(w.link)}" target="_blank" rel="noopener">License this beat · ${esc(BRAND.leasePrice)} lease</a></div>
       ${signupBox()}
       <p class="small">Bonus life earned. Next up: ${esc(curWorld().beat)}</p>
