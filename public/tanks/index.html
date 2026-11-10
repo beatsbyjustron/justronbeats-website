@@ -54,6 +54,11 @@
   .signup input:focus{border-color:var(--em)}
   #np{position:absolute;left:10px;bottom:10px;background:rgba(9,9,11,.85);border:1px solid var(--line2);border-radius:999px;padding:5px 12px;font-size:12px;color:var(--muted);display:none;pointer-events:auto;cursor:default;max-width:70%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #np b{color:var(--txt)}
+  #toast{position:absolute;top:12px;left:50%;transform:translateX(-50%) translateY(-6px);background:rgba(9,9,11,.92);border:1px solid var(--line2);border-radius:999px;padding:7px 16px;font-size:13px;color:var(--txt);opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .link{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#000;border:1px solid var(--line2);border-radius:12px;padding:10px 14px;margin:10px auto 4px;max-width:420px;word-break:break-all;color:var(--txt);user-select:all;-webkit-user-select:all}
+  .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--em);margin-right:8px;animation:pl 1.2s infinite}
+  @keyframes pl{0%,100%{opacity:.25}50%{opacity:1}}
   #splash{position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s ease}
   #splash .t{font-size:44px;font-weight:800;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;transition:transform .6s ease}
   #splash .s{font-size:12px;letter-spacing:.4em;text-transform:uppercase;color:var(--dim)}
@@ -79,6 +84,7 @@
     <canvas id="c"></canvas>
     <div id="overlay"></div>
     <div id="np"></div>
+    <div id="toast"></div>
   </div>
 </div>
 <input type="file" id="beatFile" accept="audio/*,.mp3,.wav,.ogg,.m4a" style="display:none">
@@ -107,6 +113,8 @@ const WORLDS = [
 const SIGNUP = { endpoint: '/api/subscribe', url: '', anonKey: '', table: 'tank_signups' };
 // Let players load their own audio file as the soundtrack (off for the public version).
 const ALLOW_OWN_BEAT = false;
+// Online duos: the store serves Supabase keys at configEndpoint; lib is the Supabase JS file next to this page.
+const DUO = { configEndpoint: '/api/tanks-config', lib: 'vendor/supabase.js' };
 // ===========================================================================
 const TILE = 40, COLS = 24, ROWS = 16, W = COLS * TILE, H = ROWS * TILE;
 const TAU = Math.PI * 2, R = 15;
@@ -144,6 +152,7 @@ const LEVELS = [
 
 // ---------- Tank types ----------
 const PLAYER_CFG = {name:'You', color:BRAND.playerColor, shell:230, bounces:1, max:5, cd:0.13, mines:2};
+const PLAYER2_CFG = Object.assign({}, PLAYER_CFG, {name:'Duo', color:'#fde047'});
 const TYPES = {
   b:{name:'Brown',  color:'#94653a', speed:0,   turn:1.2, cd:3.2, shell:170, bounces:1, max:1, aim:'direct', err:0.12,  dodge:0,   keep:0,   mines:0, pts:1},
   g:{name:'Ash',    color:'#8d939c', speed:45,  turn:1.8, cd:2.4, shell:170, bounces:1, max:1, aim:'direct', err:0.08,  dodge:0.3, keep:260, mines:0, pts:2},
@@ -329,7 +338,7 @@ const music = (() => {
     voice(t, [mf(root - 12), mf(root), mf(root + 7)], 2.6, vol, { type: 'sawtooth', detune: [-14, 0, 13], lp: 180, lpTo: 1400, lpTime: 0.35, lpBack: 160, atk: 0.06, rel: 1.6, q: 3, dest: dest || sat(), send: 0.4 });
   }
   function layers() {
-    const alive = tanks.filter(t => t.alive && t !== player);
+    const alive = tanks.filter(t => t.alive && !t.isPlayer);
     const types = new Set(alive.map(t => t.type));
     return { drums: types.size >= 2 || mission >= 2, horns: types.size >= 2 || mission >= 3, big: types.size >= 3 || mission >= 7, final: alive.length <= 1 };
   }
@@ -447,7 +456,7 @@ try {
   chan = new BroadcastChannel('justron-tanks');
   chan.onmessage = e => {
     if (!e.data || !e.data.playing || e.data.id === TAB_ID) return;
-    if (state === 'play') togglePause(); else { yielded = true; music.stop(); }
+    if (state === 'play' && !net.connected) togglePause(); else { yielded = true; music.stop(); }
   };
 } catch (e) { chan = null; }
 function wantMusic() {
@@ -458,7 +467,7 @@ function wantMusic() {
 }
 function syncMusic() {
   if (!musicReady) return;
-  if (state === 'play') yielded = false;
+  if (state === 'play' && !net.connected) yielded = false;
   if (!wantMusic()) { music.stop(); return; }
   const want = customBeat || worldBuf() || 'synth';
   if (music.source() !== want) music.stop();
@@ -466,7 +475,7 @@ function syncMusic() {
   if (chan && music.source()) { try { chan.postMessage({ playing: true, id: TAB_ID }); } catch (e) {} }
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state === 'play') togglePause(); else syncMusic();
+  if (document.hidden && state === 'play' && !net.connected) togglePause(); else syncMusic();
 });
 hud.mute.addEventListener('click', () => { audio(); setMute(!muted); hud.mute.blur(); });
 hud.pause.addEventListener('click', () => { audio(); if (state === 'play' || state === 'paused') togglePause(); hud.pause.blur(); });
@@ -475,27 +484,37 @@ hud.music.addEventListener('click', () => { audio(); setMusic(!musicOn); hud.mus
 // ---------- World ----------
 let grid = null, flow = null, flowTile = -1;
 let tanks = [], shells = [], mines = [], parts = [], treads = [], scorches = [];
-let player = null, levelAlive = [], mission = 0, lives = 3, score = 0, kills = 0, missionKills = {};
+let player = null, player2 = null, me = null, attempt = 0, gridV = 0, nextId = 1, netEvents = [], lostMsg = '', inviteCode = '';
+let levelAlive = [], mission = 0, lives = 3, score = 0, kills = 0, missionKills = {};
 let state = 'title', stateT = 0, shake = 0, time = 0, best = 0;
 try { best = parseInt(localStorage.getItem('rt_best') || '0', 10) || 0; } catch (e) {}
 
 const tileAt = (cx, cy) => (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) ? 1 : grid[cy * COLS + cx];
 const shellSolid = (x, y) => { const t = tileAt(Math.floor(x / TILE), Math.floor(y / TILE)); return t === 1 || t === 2; };
 const tankSolidPt = (x, y) => tileAt(Math.floor(x / TILE), Math.floor(y / TILE)) !== 0;
+const alivePlayers = () => tanks.filter(t => t.isPlayer && t.alive);
+function nearestPlayer(e) {
+  let best = null, bd = Infinity;
+  for (const p of tanks) if (p.isPlayer && p.alive) { const d = dist2(e, p); if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+function emit(v) { if (net.role === 'host' && net.connected) { netEvents.push(v); if (netEvents.length > 300) netEvents.shift(); } }
 
 function buildGrid() {
   grid = new Uint8Array(COLS * ROWS);
   for (const [x, y, w, h, t] of LEVELS[mission].w)
     for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++)
       if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) grid[yy * COLS + xx] = t === 'x' ? 2 : t === 'o' ? 3 : 1;
+  gridV++;
 }
 
 function makeTank(type, cx, cy) {
-  const cfg = type === 'player' ? PLAYER_CFG : TYPES[type];
+  const cfg = type === 'player' ? PLAYER_CFG : type === 'player2' ? PLAYER2_CFG : TYPES[type];
+  const isPlayer = type === 'player' || type === 'player2';
   return {
-    type, cfg, x: cx * TILE + TILE / 2, y: cy * TILE + TILE / 2, vx: 0, vy: 0,
-    bodyAng: type === 'player' ? 0 : Math.PI, turretAng: type === 'player' ? 0 : Math.PI,
-    alive: true, cool: rand(1.6, 2.6), thinkT: rand(0, 0.3), mineCd: rand(2, 5), solution: null,
+    id: nextId++, type, cfg, isPlayer, x: cx * TILE + TILE / 2, y: cy * TILE + TILE / 2, vx: 0, vy: 0,
+    bodyAng: isPlayer ? 0 : Math.PI, turretAng: isPlayer ? 0 : Math.PI,
+    alive: true, cool: isPlayer ? 0 : rand(1.6, 2.6), thinkT: rand(0, 0.3), mineCd: rand(2, 5), solution: null,
     wA: Math.random() * TAU, wT: 0, trackDist: 0, treadPhase: 0, recoil: 0, reveal: 0, seed: Math.random() * 10
   };
 }
@@ -546,6 +565,12 @@ function startAttempt() {
   const L = LEVELS[mission];
   player = makeTank('player', L.p[0], L.p[1]);
   tanks.push(player);
+  me = player; player2 = null; attempt++;
+  if (net.role === 'host' && net.connected) {
+    const sp = duoSpawn(L);
+    player2 = makeTank('player2', sp[0], sp[1]); player2.remote = true;
+    tanks.push(player2);
+  }
   L.e.forEach((d, i) => {
     if (!levelAlive[i]) return;
     const t = makeTank(d[0], d[1], d[2]); t.idx = i;
@@ -553,21 +578,34 @@ function startAttempt() {
     tanks.push(t);
   });
   player.turretAng = Math.atan2(H / 2 - player.y, W / 2 - player.x);
+  if (player2) player2.turretAng = player.turretAng;
   flowTile = -1;
   drawBg();
   updateHud();
   setState('intro');
 }
 
-// Breadth-first distance field from the player's tile, used by enemies to navigate
+// Free tile next to player 1's spawn for the duo partner
+function duoSpawn(L) {
+  const enemyAt = new Set(L.e.map(e => e[1] + ',' + e[2]));
+  for (const [dx, dy] of [[0,2],[0,-2],[2,0],[-2,0],[1,1],[1,-1],[-1,1],[-1,-1],[0,1],[0,-1],[1,0],[-1,0],[0,3],[0,-3],[3,0],[-3,0]]) {
+    const x = L.p[0] + dx, y = L.p[1] + dy;
+    if (x < 0 || y < 0 || x >= COLS || y >= ROWS || grid[y * COLS + x] !== 0 || enemyAt.has(x + ',' + y)) continue;
+    return [x, y];
+  }
+  return [L.p[0], L.p[1]];
+}
+
+// Breadth-first distance field from the players' tiles, used by enemies to navigate
 function computeFlow() {
-  if (!player) return;
-  const pt = Math.floor(player.y / TILE) * COLS + Math.floor(player.x / TILE);
-  if (pt === flowTile) return;
-  flowTile = pt;
+  const srcs = alivePlayers().map(p => Math.floor(p.y / TILE) * COLS + Math.floor(p.x / TILE)).filter(t => t >= 0 && t < COLS * ROWS);
+  if (!srcs.length) return;
+  const key = srcs.join(',');
+  if (key === flowTile) return;
+  flowTile = key;
   flow = new Int16Array(COLS * ROWS).fill(-1);
-  if (pt < 0 || pt >= COLS * ROWS) return;
-  const q = [pt]; flow[pt] = 0;
+  const q = [];
+  for (const pt of srcs) if (flow[pt] === -1) { flow[pt] = 0; q.push(pt); }
   for (let qi = 0; qi < q.length; qi++) {
     const c = q[qi], cx = c % COLS, cy = (c / COLS) | 0;
     for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
@@ -623,38 +661,78 @@ function fire(t, ang) {
   const c = t.cfg;
   const mx = t.x + Math.cos(ang) * 24, my = t.y + Math.sin(ang) * 24;
   t.cool = c.cd; t.recoil = 1; t.reveal = 0.35;
-  if (shellSolid(mx, my)) { puff(mx, my); sfx.puff(); return; }
-  shells.push({ x: mx, y: my, vx: Math.cos(ang) * c.shell, vy: Math.sin(ang) * c.shell, b: c.bounces, owner: t, age: 0, rocket: !!c.rocket, alive: true, trail: 0 });
-  for (let i = 0; i < 6; i++) parts.push({ x: mx, y: my, vx: Math.cos(ang + rand(-0.5, 0.5)) * rand(40, 120), vy: Math.sin(ang + rand(-0.5, 0.5)) * rand(40, 120), life: 0.25, max: 0.25, r: rand(3, 6), kind: 'fire' });
-  if (c.rocket) sfx.rocket(); else sfx.shoot(t === player);
+  if (shellSolid(mx, my)) { puff(mx, my, true); return; }
+  shells.push({ id: nextId++, x: mx, y: my, vx: Math.cos(ang) * c.shell, vy: Math.sin(ang) * c.shell, b: c.bounces, owner: t, age: 0, rocket: !!c.rocket, alive: true, trail: 0 });
+  fxFire(mx, my, ang, !!c.rocket, t.isPlayer);
+  emit({ e: 'f', x: Math.round(mx), y: Math.round(my), a: +ang.toFixed(2), r: c.rocket ? 1 : 0, p: t.isPlayer ? 1 : 0 });
+}
+// ---- visual + sound effects (shared by host and duo guest)
+function fxFire(x, y, ang, rocket, isP) {
+  for (let i = 0; i < 6; i++) parts.push({ x, y, vx: Math.cos(ang + rand(-0.5, 0.5)) * rand(40, 120), vy: Math.sin(ang + rand(-0.5, 0.5)) * rand(40, 120), life: 0.25, max: 0.25, r: rand(3, 6), kind: 'fire' });
+  if (rocket) sfx.rocket(); else sfx.shoot(isP);
+}
+function fxPuff(x, y, snd) {
+  for (let i = 0; i < 8; i++) parts.push({ x, y, vx: rand(-60, 60), vy: rand(-60, 60), life: 0.4, max: 0.4, r: rand(3, 6), kind: 'smoke' });
+  if (snd) sfx.puff();
+}
+function fxBounce(x, y) {
+  sfx.bounce();
+  for (let i = 0; i < 4; i++) parts.push({ x, y, vx: rand(-70, 70), vy: rand(-70, 70), life: 0.18, max: 0.18, r: 1.6, kind: 'spark' });
+}
+function fxKill(x, y, color) {
+  for (let i = 0; i < 26; i++) {
+    const a = Math.random() * TAU, s = rand(30, 190);
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 0.9), max: 0.9, r: rand(4, 10), kind: Math.random() < 0.55 ? 'fire' : 'smoke' });
+  }
+  parts.push({ x, y, vx: 0, vy: 0, life: 0.35, max: 0.35, r: 40, kind: 'ring' });
+  scorches.push({ x, y, a: Math.random() * TAU, color });
+  shake = Math.max(shake, 7);
+  sfx.small();
+}
+function fxExplode(x, y) {
+  for (let i = 0; i < 40; i++) {
+    const a = Math.random() * TAU, s = rand(20, 230);
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 1), max: 1, r: rand(5, 13), kind: Math.random() < 0.6 ? 'fire' : 'smoke' });
+  }
+  parts.push({ x, y, vx: 0, vy: 0, life: 0.45, max: 0.45, r: 72, kind: 'ring' });
+  scorches.push({ x, y, a: Math.random() * TAU, color: '#333', big: true });
+  shake = Math.max(shake, 12);
+  sfx.boom();
+}
+function playEvent(v) {
+  if (v.e === 'f') fxFire(v.x, v.y, v.a, !!v.r, !!v.p);
+  else if (v.e === 'k') fxKill(v.x, v.y, v.c);
+  else if (v.e === 'x') fxExplode(v.x, v.y);
+  else if (v.e === 'p') fxPuff(v.x, v.y, !!v.s);
+  else if (v.e === 'b') fxBounce(v.x, v.y);
+  else if (v.e === 'm') sfx.mine();
+  else if (v.e === 'clr') sfx.clear();
+  else if (v.e === 'lose') sfx.lose();
 }
 
 function layMine(t) {
   if (countMines(t) >= t.cfg.mines) return false;
   for (const m of mines) if (m.alive && (m.x - t.x) ** 2 + (m.y - t.y) ** 2 < 40 * 40) return false;
-  mines.push({ x: t.x, y: t.y, owner: t, t: 0, fuse: 10, alive: true });
-  sfx.mine();
+  mines.push({ id: nextId++, x: t.x, y: t.y, owner: t, t: 0, fuse: 10, alive: true });
+  sfx.mine(); emit({ e: 'm' });
   return true;
 }
 
-function puff(x, y) {
-  for (let i = 0; i < 8; i++) parts.push({ x, y, vx: rand(-60, 60), vy: rand(-60, 60), life: 0.4, max: 0.4, r: rand(3, 6), kind: 'smoke' });
+function puff(x, y, snd) {
+  fxPuff(x, y, snd);
+  emit({ e: 'p', x: Math.round(x), y: Math.round(y), s: snd ? 1 : 0 });
 }
 
 function killTank(t) {
   if (!t.alive) return;
-  if (t === player && state === 'cleared') return;
+  if (t.isPlayer && state === 'cleared') return;
   t.alive = false;
-  for (let i = 0; i < 26; i++) {
-    const a = Math.random() * TAU, s = rand(30, 190);
-    parts.push({ x: t.x, y: t.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 0.9), max: 0.9, r: rand(4, 10), kind: Math.random() < 0.55 ? 'fire' : 'smoke' });
-  }
-  parts.push({ x: t.x, y: t.y, vx: 0, vy: 0, life: 0.35, max: 0.35, r: 40, kind: 'ring' });
-  scorches.push({ x: t.x, y: t.y, a: Math.random() * TAU, color: t.cfg.color });
-  shake = Math.max(shake, 7);
-  sfx.small();
-  if (t === player) {
-    if (state === 'play') { setState('dead'); sfx.lose(); }
+  fxKill(t.x, t.y, t.cfg.color);
+  emit({ e: 'k', x: Math.round(t.x), y: Math.round(t.y), c: t.cfg.color });
+  if (t.isPlayer) {
+    // in duos the mission only fails once both tanks are down
+    if (state === 'play' && !alivePlayers().length) { setState('dead'); sfx.lose(); emit({ e: 'lose' }); }
+    else if (t === player2 || (net.connected && t === player)) toast(t === me ? 'You got hit. Your duo is still in it.' : 'Your duo got hit. Finish the mission!');
   } else {
     levelAlive[t.idx] = false;
     score += t.cfg.pts * 100; kills++;
@@ -678,15 +756,9 @@ function explode(x, y, src) {
       for (let i = 0; i < 8; i++) parts.push({ x: tx + rand(-15, 15), y: ty + rand(-15, 15), vx: rand(-90, 90), vy: rand(-90, 90), life: rand(0.4, 0.8), max: 0.8, r: rand(2, 5), kind: 'chip' });
     }
   }
-  if (changed) { drawBg(); flowTile = -1; }
-  for (let i = 0; i < 40; i++) {
-    const a = Math.random() * TAU, s = rand(20, 230);
-    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 1), max: 1, r: rand(5, 13), kind: Math.random() < 0.6 ? 'fire' : 'smoke' });
-  }
-  parts.push({ x, y, vx: 0, vy: 0, life: 0.45, max: 0.45, r: RAD, kind: 'ring' });
-  scorches.push({ x, y, a: Math.random() * TAU, color: '#333', big: true });
-  shake = Math.max(shake, 12);
-  sfx.boom();
+  if (changed) { gridV++; drawBg(); flowTile = -1; }
+  fxExplode(x, y);
+  emit({ e: 'x', x: Math.round(x), y: Math.round(y) });
 }
 
 // ---------- Input ----------
@@ -701,15 +773,16 @@ window.addEventListener('keydown', e => {
   if (k === 'm') setMute(!muted);
   if (k === 'n') setMusic(!musicOn);
   if ((k === 'p' || k === 'escape') && (state === 'play' || state === 'paused')) togglePause();
-  if (k === ' ' && state === 'play' && player.alive) layMine(player);
+  if (k === ' ' && state === 'play' && me && me.alive) dropMine();
   if (k === 'enter') {
     if (state === 'intro') beginPlay();
-    else if (state === 'title' || state === 'over' || state === 'win') startGame();
+    else if (net.role === 'guest') return;
+    else if (state === 'title' || state === 'over' || state === 'win' || (state === 'lobby' && net.connected)) startGame();
     else if (state === 'world') newMission();
   }
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play') togglePause(); });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play' && !net.connected) togglePause(); });
 function canvasPos(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
@@ -721,10 +794,18 @@ canvas.addEventListener('mousedown', e => {
   audio();
   const p = canvasPos(e); mouse.x = p.x; mouse.y = p.y;
   if (state === 'intro') { beginPlay(); return; }
-  if (state !== 'play' || !player.alive) return;
-  if (e.button === 0) { if (player.cool <= 0 && countShells(player) < PLAYER_CFG.max) fire(player, player.turretAng); }
-  else if (e.button === 2) layMine(player);
+  if (state !== 'play' || !me || !me.alive) return;
+  if (e.button === 0) shoot();
+  else if (e.button === 2) dropMine();
 });
+function shoot() {
+  if (me.cool > 0 || countShells(me) >= PLAYER_CFG.max) return;
+  if (net.role === 'guest') { me.cool = PLAYER_CFG.cd; net.send({ t: 'fire', a: +me.turretAng.toFixed(3) }); }
+  else fire(me, me.turretAng);
+}
+function dropMine() {
+  if (net.role === 'guest') net.send({ t: 'mine' }); else layMine(me);
+}
 
 // ---------- States / UI ----------
 function setState(s) {
@@ -737,8 +818,8 @@ function setState(s) {
   hud.pause.textContent = s === 'paused' ? 'Resume' : 'Pause';
   updateNowPlaying();
 }
-function beginPlay() { music.cutJingle(); setState('play'); }
-function togglePause() { setState(state === 'paused' ? 'play' : 'paused'); }
+function beginPlay() { music.cutJingle(); if (net.role === 'guest') { net.send({ t: 'go' }); return; } setState('play'); }
+function togglePause() { if (net.role === 'guest') { net.send({ t: 'pause' }); return; } setState(state === 'paused' ? 'play' : 'paused'); }
 
 function startGame(from = 0) {
   mission = Math.max(0, Math.min(LEVELS.length - 1, from)); lives = 3; score = 0; kills = 0;
@@ -795,9 +876,33 @@ function renderOverlay() {
       <p class="small">Mines break the cracked blocks and anything nearby, including you. Shells fly over pits.</p>
       ${best ? `<p class="small">Best: reached mission ${best}</p>` : ''}
       <div class="row"><button class="btn" data-act="start">Start</button>${best > 1 ? `<button class="btn" data-act="continue">Continue · M${Math.min(best, LEVELS.length)}</button>` : ''}</div>
+      ${net.avail ? '<div class="row"><button class="btn2" data-act="duo">Play duos · invite a friend</button></div>' : ''}
       ${codesList()}
       ${ALLOW_OWN_BEAT ? beatSection() : ''}
     </div>`;
+  } else if (state === 'lobby' && net.role === 'host') {
+    html = net.connected ? `<div class="panel">
+      <h1>DUOS</h1>
+      <p><span class="pulse"></span>Your duo is in. You're green, they're yellow.</p>
+      <p class="small">Same controls for both of you. A mission only fails if both tanks go down.</p>
+      <div class="row"><button class="btn" data-act="start">Start</button>${best > 1 ? `<button class="btn" data-act="continue">Continue · M${Math.min(best, LEVELS.length)}</button>` : ''}</div>
+      <div class="row"><button class="btn2" data-act="leave">Leave duo</button></div>
+    </div>` : `<div class="panel">
+      <h1>DUOS</h1>
+      <p>Send this link to your duo:</p>
+      <div class="link">${esc(net.link())}</div>
+      <div class="row"><button class="btn" data-act="copylink">Copy invite link</button></div>
+      <p class="small"><span class="pulse"></span>Waiting for them to join…</p>
+      <div class="row"><button class="btn2" data-act="leave">Cancel</button></div>
+    </div>`;
+  } else if (net.role === 'guest' && (state === 'lobby' || state === 'title')) {
+    html = `<div class="panel"><h1>DUOS</h1><p><span class="pulse"></span>You're in. Waiting for your duo to start…</p><p class="small">You're the yellow tank. Same controls: WASD to drive, mouse to aim, click to fire, Space for mines.</p><div class="row"><button class="btn2" data-act="leave">Leave</button></div></div>`;
+  } else if (state === 'join') {
+    html = `<div class="panel"><h1>DUOS</h1><p>Your friend invited you to play Justron Tanks together.</p><div class="row"><button class="btn" data-act="join">Join game</button></div><div class="row"><button class="btn2" data-act="leave">Play solo instead</button></div></div>`;
+  } else if (state === 'joining') {
+    html = `<div class="panel"><h1>DUOS</h1><p><span class="pulse"></span>Connecting to your duo…</p></div>`;
+  } else if (state === 'lost') {
+    html = `<div class="panel"><h2>DUO ENDED</h2><p>${esc(lostMsg)}</p><div class="row"><button class="btn" data-act="leave">Play solo</button></div></div>`;
   } else if (state === 'intro') {
     const L = LEVELS[mission], counts = {};
     L.e.forEach((e, i) => { if (levelAlive[i]) counts[e[0]] = (counts[e[0]] || 0) + 1; });
@@ -815,7 +920,7 @@ function renderOverlay() {
   } else if (state === 'cleared') {
     html = `<div class="banner"><h2>MISSION CLEARED</h2></div>`;
   } else if (state === 'dead') {
-    html = `<div class="banner"><h2>TANK DESTROYED</h2><p>${lives - 1 > 0 ? `${lives - 1} ${lives - 1 === 1 ? 'life' : 'lives'} left` : 'No lives left'}</p></div>`;
+    html = `<div class="banner"><h2>${net.connected ? 'BOTH TANKS DOWN' : 'TANK DESTROYED'}</h2><p>${lives - 1 > 0 ? `${lives - 1} ${lives - 1 === 1 ? 'life' : 'lives'} left` : 'No lives left'}</p></div>`;
   } else if (state === 'over' || state === 'win') {
     const reached = state === 'win' ? LEVELS.length : mission + 1;
     html = `<div class="panel">
@@ -840,6 +945,11 @@ function renderOverlay() {
       <p class="small">Bonus life earned. Next up: ${esc(curWorld().beat)}</p>
       <button class="btn" data-act="nextworld">World ${wi + 2} →</button>
     </div>`;
+  }
+  if (net.role === 'guest') {
+    // only the host drives menus; the guest sees what's happening
+    html = html.replace(/<button class="btn" data-act="(start|continue|nextworld)"[^>]*>[\s\S]*?<\/button>/g, '<p class="small">Waiting for your duo…</p>')
+      .replace(/<button class="btn2" data-act="(restart|quit)"[^>]*>[\s\S]*?<\/button>/g, '');
   }
   overlay.innerHTML = html;
 }
@@ -878,11 +988,19 @@ overlay.addEventListener('click', e => {
   if (!b) return;
   audio();
   const act = b.dataset.act;
+  if (act === 'resume') togglePause();
+  if (act === 'leave') leaveDuo();
+  if (act === 'copylink') {
+    const done = () => { b.textContent = 'Copied!'; setTimeout(() => { b.textContent = 'Copy invite link'; }, 1500); };
+    try { navigator.clipboard.writeText(net.link()).then(done, () => {}); } catch (err) {}
+  }
+  if (act === 'duo') startDuo();
+  if (act === 'join') joinDuo();
+  if (net.role === 'guest') return;
   if (act === 'start') startGame();
   if (act === 'continue') startGame(best - 1);
-  if (act === 'resume') setState('play');
   if (act === 'restart') startAttempt();
-  if (act === 'quit') setState('title');
+  if (act === 'quit') setState(net.connected ? 'lobby' : 'title');
   if (act === 'loadbeat') beatFile.click();
   if (act === 'nextworld') newMission();
   if (act === 'copy') {
@@ -896,7 +1014,7 @@ overlay.addEventListener('click', e => {
 function updateHud() {
   hud.mission.textContent = `${mission + 1}/${LEVELS.length}`;
   hud.lives.textContent = '♥'.repeat(Math.max(0, lives));
-  hud.enemies.textContent = tanks.filter(t => t.alive && t !== player).length;
+  hud.enemies.textContent = tanks.filter(t => t.alive && !t.isPlayer).length;
   hud.score.textContent = score;
 }
 
@@ -906,7 +1024,7 @@ function saveBest(m) {
 
 // ---------- Update ----------
 function moveTank(t, dt) {
-  t.x += t.vx * dt; t.y += t.vy * dt;
+  if (!t.remote) { t.x += t.vx * dt; t.y += t.vy * dt; }
   // circle vs tile collision
   for (let iter = 0; iter < 2; iter++) {
     const cx0 = Math.floor((t.x - R) / TILE), cx1 = Math.floor((t.x + R) / TILE);
@@ -932,7 +1050,7 @@ function moveTank(t, dt) {
   }
 }
 
-function updatePlayer(dt) {
+function updatePlayer(t, dt) {
   let ix = 0, iy = 0;
   if (state === 'play') {
     if (keys['d'] || keys['arrowright']) ix += 1;
@@ -943,27 +1061,30 @@ function updatePlayer(dt) {
   const l = Math.hypot(ix, iy);
   const tvx = l ? ix / l * PLAYER_SPEED : 0, tvy = l ? iy / l * PLAYER_SPEED : 0;
   const k = Math.min(1, dt * 14);
-  player.vx += (tvx - player.vx) * k; player.vy += (tvy - player.vy) * k;
-  player.turretAng = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-  player.cool -= dt;
+  t.vx += (tvx - t.vx) * k; t.vy += (tvy - t.vy) * k;
+  t.turretAng = Math.atan2(mouse.y - t.y, mouse.x - t.x);
+  t.cool -= dt;
 }
 
 function think(e) {
   const c = e.cfg;
   e.solution = null;
-  if (!player.alive || state !== 'play') return;
-  let tx = player.x, ty = player.y;
-  if (c.lead) { const tt = Math.sqrt(dist2(e, player)) / c.shell; tx += player.vx * tt * 0.9; ty += player.vy * tt * 0.9; }
-  const a0 = Math.atan2(ty - e.y, tx - e.x);
-  const h = traceShot(e.x, e.y, a0, c.bounces, e);
-  if (h && h.tank === player) { e.solution = a0; }
-  else if (c.aim === 'bounce') {
+  e.tgt = nearestPlayer(e);
+  if (!e.tgt || state !== 'play') return;
+  for (const p of alivePlayers().sort((a, b) => dist2(e, a) - dist2(e, b))) {
+    let tx = p.x, ty = p.y;
+    if (c.lead) { const tt = Math.sqrt(dist2(e, p)) / c.shell; tx += p.vx * tt * 0.9; ty += p.vy * tt * 0.9; }
+    const a0 = Math.atan2(ty - e.y, tx - e.x);
+    const h = traceShot(e.x, e.y, a0, c.bounces, e);
+    if (h && h.tank.isPlayer) { e.solution = a0; break; }
+  }
+  if (e.solution == null && c.aim === 'bounce') {
     let bestA = null, bd = 99;
     const N = 80, off = Math.random() * TAU / N;
     for (let i = 0; i < N; i++) {
       const a = off + i / N * TAU;
       const hh = traceShot(e.x, e.y, a, c.bounces, e);
-      if (hh && hh.tank === player) { const d = Math.abs(angDiff(e.turretAng, a)); if (d < bd) { bd = d; bestA = a; } }
+      if (hh && hh.tank.isPlayer) { const d = Math.abs(angDiff(e.turretAng, a)); if (d < bd) { bd = d; bestA = a; } }
     }
     e.solution = bestA;
   }
@@ -971,7 +1092,7 @@ function think(e) {
   if (c.mines && e.mineCd <= 0 && countMines(e) < c.mines && Math.random() < (e.type === 'y' ? 0.35 : 0.15)) {
     let near = false;
     for (const m of mines) if (m.alive && (m.x - e.x) ** 2 + (m.y - e.y) ** 2 < 110 * 110) near = true;
-    if (!near && dist2(e, player) < 420 * 420 && dist2(e, player) > 70 * 70) { if (layMine(e)) e.mineCd = rand(3, 6); }
+    if (!near && dist2(e, e.tgt) < 420 * 420 && dist2(e, e.tgt) > 70 * 70) { if (layMine(e)) e.mineCd = rand(3, 6); }
   }
 }
 
@@ -979,18 +1100,19 @@ function updateEnemy(e, dt) {
   const c = e.cfg;
   e.cool -= dt; e.thinkT -= dt; e.mineCd -= dt;
   if (e.thinkT <= 0) { e.thinkT = rand(0.2, 0.32); think(e); }
-  const want = e.solution != null ? e.solution : Math.atan2(player.y - e.y, player.x - e.x) + Math.sin(time * 0.8 + e.seed) * 0.9;
+  const tp = (e.tgt && e.tgt.alive) ? e.tgt : (nearestPlayer(e) || player);
+  const want = e.solution != null ? e.solution : Math.atan2(tp.y - e.y, tp.x - e.x) + Math.sin(time * 0.8 + e.seed) * 0.9;
   e.turretAng = rotToward(e.turretAng, want, c.turn * dt);
-  if (e.solution != null && state === 'play' && player.alive && e.cool <= 0 && countShells(e) < c.max && Math.abs(angDiff(e.turretAng, e.solution)) < 0.06) {
+  if (e.solution != null && state === 'play' && tp.alive && e.cool <= 0 && countShells(e) < c.max && Math.abs(angDiff(e.turretAng, e.solution)) < 0.06) {
     const h = traceShot(e.x, e.y, e.turretAng, c.bounces, e);
-    if (h && h.tank === player) fire(e, e.turretAng + rand(-c.err, c.err));
+    if (h && h.tank.isPlayer) fire(e, e.turretAng + rand(-c.err, c.err));
     else { e.cool = 0.15; e.solution = null; }
   }
   // movement
   let dx = 0, dy = 0;
   if (c.speed > 0 && state !== 'intro') {
-    const dP = Math.sqrt(dist2(e, player));
-    if (player.alive) {
+    const dP = Math.sqrt(dist2(e, tp));
+    if (tp.alive) {
       if (dP > c.keep) { const v = flowDir(e, false); if (v) { dx += v[0]; dy += v[1]; } }
       else if (dP < c.keep * 0.55) { const v = flowDir(e, true); if (v) { dx += v[0]; dy += v[1]; } }
     }
@@ -1043,7 +1165,7 @@ function updateShells(dt) {
       for (const t of tanks) {
         if (!t.alive || (t === s.owner && s.age < 0.15)) continue;
         if ((t.x - s.x) ** 2 + (t.y - s.y) ** 2 < 18 * 18) {
-          if (t === player && state === 'cleared') { s.alive = false; puff(s.x, s.y); break; }
+          if (t.isPlayer && state === 'cleared') { s.alive = false; puff(s.x, s.y); break; }
           s.alive = false; killTank(t); break;
         }
       }
@@ -1065,15 +1187,15 @@ function updateShells(dt) {
     const a = shells[i]; if (!a.alive) continue;
     for (let j = i + 1; j < shells.length; j++) {
       const b = shells[j]; if (!b.alive) continue;
-      if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 < 8 * 8) { a.alive = b.alive = false; puff((a.x + b.x) / 2, (a.y + b.y) / 2); sfx.puff(); break; }
+      if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 < 8 * 8) { a.alive = b.alive = false; puff((a.x + b.x) / 2, (a.y + b.y) / 2, true); break; }
     }
   }
   shells = shells.filter(s => s.alive);
 }
 function bounceShell(s) {
   s.b--;
-  if (s.b < 0) { s.alive = false; puff(s.x, s.y); sfx.puff(); }
-  else { sfx.bounce(); for (let i = 0; i < 4; i++) parts.push({ x: s.x, y: s.y, vx: rand(-70, 70), vy: rand(-70, 70), life: 0.18, max: 0.18, r: 1.6, kind: 'spark' }); }
+  if (s.b < 0) { s.alive = false; puff(s.x, s.y, true); }
+  else { fxBounce(s.x, s.y); emit({ e: 'b', x: Math.round(s.x), y: Math.round(s.y) }); }
 }
 
 function updateMines(dt) {
@@ -1087,7 +1209,7 @@ function updateMines(dt) {
       }
     }
     const left = m.fuse - m.t;
-    if (left < 2.5) { m.blink = (m.blink || 0) - dt; if (m.blink <= 0) { m.blink = Math.max(0.08, left / 6); if (m.owner === player || Math.random() < 0.5) sfx.beep(); } }
+    if (left < 2.5) { m.blink = (m.blink || 0) - dt; if (m.blink <= 0) { m.blink = Math.max(0.08, left / 6); if (m.owner === me || Math.random() < 0.5) sfx.beep(); } }
     if (m.t >= m.fuse) { m.alive = false; explode(m.x, m.y, m); }
   }
   mines = mines.filter(m => m.alive);
@@ -1102,7 +1224,7 @@ function separateTanks() {
       if (d < R * 2 && d > 0.01) {
         const push = (R * 2 - d) / 2; dx /= d; dy /= d;
         const am = a.cfg.speed === 0 ? 0 : 1, bm = b.cfg.speed === 0 ? 0 : 1;
-        const aw = a === player ? 1 : am, bw = b === player ? 1 : bm, tot = (aw + bw) || 1;
+        const aw = a.isPlayer ? 1 : am, bw = b.isPlayer ? 1 : bm, tot = (aw + bw) || 1;
         a.x -= dx * push * 2 * aw / tot; a.y -= dy * push * 2 * aw / tot;
         b.x += dx * push * 2 * bw / tot; b.y += dy * push * 2 * bw / tot;
       }
@@ -1117,14 +1239,17 @@ function update(dt) {
   parts = parts.filter(p => p.life > 0);
   for (const t of treads) t.life -= dt;
   while (treads.length && treads[0].life <= 0) treads.shift();
+  net.tick(dt);
+  if (net.role === 'guest') { updateGuest(dt); return; }
 
-  if (state === 'title' || state === 'over' || state === 'win' || state === 'paused' || state === 'world') return;
+  if (['title', 'over', 'win', 'paused', 'world', 'lobby', 'join', 'joining', 'lost'].includes(state)) return;
 
   if (state === 'intro') { if (stateT > 2.6) setState('play'); return; }
 
   computeFlow();
-  if (player.alive) updatePlayer(dt);
-  for (const t of tanks) if (t.alive && t !== player) updateEnemy(t, dt);
+  if (player.alive) updatePlayer(player, dt);
+  if (player2) player2.cool -= dt;
+  for (const t of tanks) if (t.alive && !t.isPlayer) updateEnemy(t, dt);
   for (const t of tanks) {
     if (!t.alive) continue;
     t.recoil = Math.max(0, t.recoil - dt * 6); t.reveal = Math.max(0, t.reveal - dt);
@@ -1136,8 +1261,8 @@ function update(dt) {
   updateMines(dt);
 
   if (state === 'play') {
-    const left = tanks.filter(t => t.alive && t !== player).length;
-    if (left === 0 && player.alive) { setState('cleared'); sfx.clear(); }
+    const left = tanks.filter(t => t.alive && !t.isPlayer).length;
+    if (left === 0 && alivePlayers().length) { setState('cleared'); sfx.clear(); emit({ e: 'clr' }); }
   }
   if (state === 'cleared' && stateT > 2.2) {
     mission++;
@@ -1225,7 +1350,7 @@ function drawBg() {
 function tankAlpha(t) {
   if (!t.cfg.invisible) return 1;
   if (state === 'intro') return 0.85;
-  if (!player.alive || state === 'dead' || state === 'over') return 0.6;
+  if (!alivePlayers().length || state === 'dead' || state === 'over') return 0.6;
   return Math.min(0.55, t.reveal * 2);
 }
 
@@ -1237,7 +1362,7 @@ function drawTank(t) {
   // shadow
   ctx.fillStyle = 'rgba(0,0,0,.5)';
   ctx.beginPath(); ctx.ellipse(t.x + 4, t.y + 6, 19, 16, 0, 0, TAU); ctx.fill();
-  if (t === player) { ctx.fillStyle = 'rgba(52,211,153,.10)'; ctx.beginPath(); ctx.arc(t.x, t.y, 30, 0, TAU); ctx.fill(); }
+  if (t.isPlayer) { ctx.fillStyle = t.type === 'player2' ? 'rgba(253,224,71,.10)' : 'rgba(52,211,153,.10)'; ctx.beginPath(); ctx.arc(t.x, t.y, 30, 0, TAU); ctx.fill(); }
   ctx.translate(t.x, t.y);
   ctx.rotate(t.bodyAng);
   // treads
@@ -1313,6 +1438,11 @@ function render() {
   }
   // tanks
   for (const t of tanks) if (t.alive) drawTank(t);
+  if (net.connected) {
+    ctx.save(); ctx.font = '700 10px ui-sans-serif,system-ui,sans-serif'; ctx.textAlign = 'center';
+    for (const t of tanks) if (t.isPlayer && t.alive) { ctx.fillStyle = t.type === 'player2' ? '#fde047' : '#34d399'; ctx.fillText(t === me ? 'YOU' : 'DUO', t.x, t.y - 25); }
+    ctx.restore();
+  }
   // shells
   for (const s of shells) {
     const a = Math.atan2(s.vy, s.vx);
@@ -1340,23 +1470,25 @@ function render() {
     else if (p.kind === 'ring') { ctx.strokeStyle = `rgba(255,230,180,${k * 0.8})`; ctx.lineWidth = 4 * k + 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.15 - k * 0.8), 0, TAU); ctx.stroke(); }
   }
   // aim line + reticle
-  if (player && player.alive && (state === 'play') && mouse.inside) {
-    const ax = player.x + Math.cos(player.turretAng) * 26, ay = player.y + Math.sin(player.turretAng) * 26;
+  if (me && me.alive && (state === 'play') && mouse.inside) {
+    const ax = me.x + Math.cos(me.turretAng) * 26, ay = me.y + Math.sin(me.turretAng) * 26;
+    const yel = me.type === 'player2';
     ctx.save();
     ctx.setLineDash([3, 9]); ctx.lineDashOffset = -time * 30;
-    ctx.strokeStyle = 'rgba(52,211,153,.4)'; ctx.lineWidth = 2;
+    ctx.strokeStyle = yel ? 'rgba(253,224,71,.4)' : 'rgba(52,211,153,.4)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.strokeStyle = '#6ee7b7'; ctx.lineWidth = 2;
+    ctx.strokeStyle = yel ? '#fde68a' : '#6ee7b7'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 10, 0, TAU); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(mouse.x - 15, mouse.y); ctx.lineTo(mouse.x - 6, mouse.y); ctx.moveTo(mouse.x + 6, mouse.y); ctx.lineTo(mouse.x + 15, mouse.y);
     ctx.moveTo(mouse.x, mouse.y - 15); ctx.lineTo(mouse.x, mouse.y - 6); ctx.moveTo(mouse.x, mouse.y + 6); ctx.lineTo(mouse.x, mouse.y + 15); ctx.stroke();
     ctx.restore();
     // ammo pips near player
-    const left = PLAYER_CFG.max - countShells(player);
+    const left = PLAYER_CFG.max - countShells(me);
+    const pc = yel ? '253,230,138' : '110,231,183';
     for (let i = 0; i < PLAYER_CFG.max; i++) {
-      ctx.fillStyle = i < left ? 'rgba(110,231,183,.9)' : 'rgba(110,231,183,.15)';
-      ctx.fillRect(player.x - 14 + i * 6, player.y + 22, 4, 4);
+      ctx.fillStyle = i < left ? `rgba(${pc},.9)` : `rgba(${pc},.15)`;
+      ctx.fillRect(me.x - 14 + i * 6, me.y + 22, 4, 4);
     }
   }
   if (state === 'title') { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, W, H); }
@@ -1374,18 +1506,325 @@ function frame(ts) {
 }
 let hudCache = '';
 function updateHudCheap() {
-  const n = tanks.filter(t => t.alive && t !== player).length;
+  const n = tanks.filter(t => t.alive && !t.isPlayer).length;
   const key = n + '|' + score + '|' + lives + '|' + mission;
   if (key !== hudCache) { hudCache = key; updateHud(); }
 }
 
+// ================= DUOS: online two-player =================
+// The host's browser runs the game. The guest drives their own tank locally and
+// streams it to the host; the host streams the world back. Browsers connect
+// directly (WebRTC) using Supabase Realtime only to find each other, and fall
+// back to relaying through Supabase if a direct link can't be made.
+const net = (() => {
+  const n = { role: 'solo', connected: false, p2p: false, code: '', avail: false };
+  const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+  const myId = Math.random().toString(36).slice(2, 10);
+  let cfg = null, client = null, ch = null, pc = null, dc = null, peerId = null, iceQueue = [];
+  let acc = 0, hbAcc = 0, snapN = 0, lastGridSent = -1, lastRecv = 0, relayTimer = null, joinTimer = null, testSend = null;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const plain = o => (o && o.toJSON ? o.toJSON() : o);
+
+  n.checkAvailable = () => fetch(asset(DUO.configEndpoint))
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => { if (j && j.url && j.key) { cfg = j; n.avail = true; } return n.avail; })
+    .catch(() => false);
+  function loadLib() {
+    if (window.supabase && window.supabase.createClient) return Promise.resolve();
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = asset(DUO.lib); s.onload = () => res(); s.onerror = () => rej(new Error('lib')); document.head.appendChild(s); });
+  }
+  async function openChannel(code) {
+    await loadLib();
+    if (!client) client = window.supabase.createClient(cfg.url, cfg.key, { realtime: { params: { eventsPerSecond: 40 } } });
+    ch = client.channel('jt-duo-' + code, { config: { broadcast: { self: false } } });
+    ch.on('broadcast', { event: 'sig' }, msg => onSig(msg.payload));
+    ch.on('broadcast', { event: 'g' }, msg => { const p = msg.payload; if (p && p.from === peerId) onGame(p.m); });
+    await new Promise((res, rej) => {
+      const t = setTimeout(() => rej(new Error('timeout')), 12000);
+      ch.subscribe(st => {
+        if (st === 'SUBSCRIBED') { clearTimeout(t); res(); }
+        else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') { clearTimeout(t); rej(new Error(st)); }
+      });
+    });
+  }
+  const sig = m => { if (ch) ch.send({ type: 'broadcast', event: 'sig', payload: Object.assign({}, m, { from: myId }) }); };
+  function makeCode() {
+    const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint8Array(6);
+    (window.crypto || crypto).getRandomValues(a);
+    return Array.from(a, v => abc[v % abc.length]).join('');
+  }
+
+  n.host = async () => { n.role = 'host'; n.code = makeCode(); await openChannel(n.code); };
+  n.join = async code => {
+    n.role = 'guest'; n.code = code;
+    await openChannel(code);
+    sig({ t: 'hello' });
+    let tries = 0;
+    joinTimer = setInterval(() => {
+      if (peerId) { clearInterval(joinTimer); return; }
+      if (++tries > 7) { clearInterval(joinTimer); n.onFail('notfound'); return; }
+      sig({ t: 'hello' });
+    }, 1500);
+  };
+  async function onSig(p) {
+    if (!p || p.from === myId) return;
+    if (n.role === 'host') {
+      if (p.t === 'hello') {
+        if (peerId && peerId !== p.from) { sig({ t: 'full', to: p.from }); return; }
+        if (peerId === p.from) return;
+        peerId = p.from; sig({ t: 'welcome', to: peerId });
+        startRTC(true);
+      } else if (p.from === peerId) await rtcSig(p);
+    } else if (n.role === 'guest') {
+      if (p.to && p.to !== myId) return;
+      if (p.t === 'full') { n.onFail('full'); return; }
+      if (p.t === 'welcome') { if (!peerId) { peerId = p.from; startRTC(false); } return; }
+      if (p.from === peerId) await rtcSig(p);
+    }
+  }
+  function startRTC(isHost) {
+    relayTimer = setTimeout(() => { if (!n.connected) goLive(false); }, 7000);
+    if (typeof RTCPeerConnection === 'undefined') return;
+    try {
+      pc = new RTCPeerConnection({ iceServers: ICE });
+      pc.onicecandidate = e => { if (e.candidate) sig({ t: 'ice', c: plain(e.candidate), to: peerId }); };
+      if (isHost) {
+        dc = pc.createDataChannel('game', { ordered: true }); wireDC(dc);
+        pc.createOffer().then(o => pc.setLocalDescription(o)).then(() => sig({ t: 'offer', sdp: plain(pc.localDescription), to: peerId })).catch(() => {});
+      } else {
+        pc.ondatachannel = e => { dc = e.channel; wireDC(dc); };
+      }
+    } catch (e) { pc = null; }
+  }
+  async function rtcSig(p) {
+    if (!pc) return;
+    try {
+      if (p.t === 'offer') {
+        await pc.setRemoteDescription(p.sdp);
+        await pc.setLocalDescription(await pc.createAnswer());
+        sig({ t: 'answer', sdp: plain(pc.localDescription), to: peerId });
+        flushIce();
+      } else if (p.t === 'answer') { await pc.setRemoteDescription(p.sdp); flushIce(); }
+      else if (p.t === 'ice') { if (pc.remoteDescription) await pc.addIceCandidate(p.c); else iceQueue.push(p.c); }
+    } catch (e) {}
+  }
+  function flushIce() { for (const c of iceQueue.splice(0)) pc.addIceCandidate(c).catch(() => {}); }
+  function wireDC(c) {
+    c.onopen = () => goLive(true);
+    c.onmessage = e => { try { onGame(JSON.parse(e.data)); } catch (err) {} };
+    c.onclose = () => { n.p2p = false; }; // keep going over the relay
+  }
+  function goLive(p2p) {
+    n.p2p = p2p;
+    if (n.connected) return;
+    clearTimeout(relayTimer);
+    n.connected = true; lastRecv = now();
+    n.onConnect();
+  }
+  function onGame(m) {
+    if (!m) return;
+    lastRecv = now();
+    if (m.t === 'hb') return;
+    if (m.t === 'bye') { n.lost(); return; }
+    if (n.role === 'host') hostOnMsg(m); else if (n.role === 'guest') guestOnMsg(m);
+  }
+  n.send = m => {
+    if (!n.connected) return;
+    if (testSend) { testSend(m); return; }
+    if (n.p2p && dc && dc.readyState === 'open') { try { dc.send(JSON.stringify(m)); return; } catch (e) {} }
+    if (ch) ch.send({ type: 'broadcast', event: 'g', payload: { from: myId, m } });
+  };
+  n.tick = dt => {
+    if (!n.connected) return;
+    if (now() - lastRecv > 8000) { n.lost(); return; }
+    hbAcc += dt; if (hbAcc > 1) { hbAcc = 0; n.send({ t: 'hb' }); }
+    acc += dt;
+    if (acc < (n.p2p ? 0.05 : 0.1)) return;
+    acc = 0;
+    if (n.role === 'host') {
+      snapN++;
+      const full = gridV !== lastGridSent || snapN % 40 === 0;
+      if (full) lastGridSent = gridV;
+      n.send(makeSnap(full));
+    } else if (me) {
+      n.send({ t: 'pos', at: attempt, x: Math.round(me.x), y: Math.round(me.y), b: +me.bodyAng.toFixed(2), ta: +me.turretAng.toFixed(2), vx: Math.round(me.vx), vy: Math.round(me.vy) });
+    }
+  };
+  n.leave = notify => {
+    if (notify && n.connected) n.send({ t: 'bye' });
+    try { if (dc) dc.close(); } catch (e) {}
+    try { if (pc) pc.close(); } catch (e) {}
+    try { if (ch && client) client.removeChannel(ch); } catch (e) {}
+    clearTimeout(relayTimer); clearInterval(joinTimer);
+    dc = pc = ch = null; peerId = null; iceQueue = []; testSend = null; lastGridSent = -1; snapN = 0;
+    const was = n.role;
+    n.connected = false; n.p2p = false; n.role = 'solo'; n.code = '';
+    return was;
+  };
+  n.lost = () => { const was = n.leave(false); n.onLost(was); };
+  n.link = () => location.origin + location.pathname.replace(/index\.html?$/, '') + '?duo=' + n.code;
+  // test hooks: wire two games together without a network
+  n._test = (role, send) => { n.role = role; testSend = send; n.connected = true; n.p2p = true; lastRecv = now(); n.onConnect(); };
+  n._recv = m => onGame(m);
+  return n;
+})();
+
+function makeSnap(full) {
+  const snap = {
+    t: 's', st: state, m: mission, l: lives, sc: score, k: kills, at: attempt, g: gridV,
+    la: levelAlive.map(v => (v ? 1 : 0)),
+    tk: tanks.map(t => [t.id, t.type, Math.round(t.x), Math.round(t.y), Math.round(t.bodyAng * 100), Math.round(t.turretAng * 100), t.alive ? 1 : 0, t.reveal > 0.25 ? 1 : 0]),
+    sh: shells.filter(s => s.alive).map(s => [s.id, Math.round(s.x), Math.round(s.y), Math.round(s.vx), Math.round(s.vy), s.rocket ? 1 : 0, s.owner ? s.owner.id : 0]),
+    mn: mines.filter(m => m.alive).map(m => [m.id, Math.round(m.x), Math.round(m.y), Math.round((m.fuse - m.t) * 10), m.owner ? m.owner.id : 0]),
+    ev: netEvents.splice(0)
+  };
+  if (full && grid) snap.grid = Array.from(grid).join('');
+  return snap;
+}
+function hostOnMsg(m) {
+  const p2 = player2;
+  if (m.t === 'pos') {
+    if (p2 && p2.alive && m.at === attempt && (state === 'play' || state === 'cleared')) {
+      p2.x = m.x; p2.y = m.y; p2.bodyAng = m.b; p2.turretAng = m.ta; p2.vx = m.vx; p2.vy = m.vy;
+    }
+  } else if (m.t === 'fire') {
+    if (p2 && p2.alive && state === 'play' && countShells(p2) < PLAYER_CFG.max) fire(p2, m.a);
+  } else if (m.t === 'mine') {
+    if (p2 && p2.alive && state === 'play') layMine(p2);
+  } else if (m.t === 'pause') {
+    if (state === 'play' || state === 'paused') togglePause();
+  } else if (m.t === 'go') {
+    if (state === 'intro') beginPlay();
+  }
+}
+function guestOnMsg(m) { if (m.t === 's') applySnap(m); }
+function applySnap(m) {
+  if (m.m !== mission) { mission = m.m; loadWorldBeat(worldOf(mission)); loadWorldBeat(worldOf(mission) + 1); }
+  lives = m.l; score = m.sc; kills = m.k; levelAlive = m.la.map(Boolean);
+  if (m.grid) { grid = Uint8Array.from(m.grid, c => +c); gridV = m.g; drawBg(); }
+  if (m.at !== attempt) { attempt = m.at; tanks = []; shells = []; mines = []; treads = []; scorches = []; me = null; player = null; }
+  if (!grid) return; // wait for the first full snapshot
+  const byId = new Map(tanks.map(t => [t.id, t]));
+  const next = [];
+  for (const [id, type, x, y, b, ta, al, rv] of m.tk) {
+    let t = byId.get(id);
+    if (!t) {
+      t = makeTank(type, 0, 0); t.id = id; t.x = x; t.y = y; t.bodyAng = b / 100; t.turretAng = ta / 100;
+      if (type === 'player2') me = t;
+      if (type === 'player') player = t;
+    }
+    if (t !== me) { t.tx = x; t.ty = y; t.tb = b / 100; t.tta = ta / 100; }
+    t.alive = !!al;
+    if (rv) t.reveal = 0.35;
+    next.push(t);
+  }
+  tanks = next;
+  const tankById = new Map(tanks.map(t => [t.id, t]));
+  const oldShells = new Map(shells.map(s => [s.id, s]));
+  shells = m.sh.map(([id, x, y, vx, vy, r, o]) => {
+    const s = oldShells.get(id) || { id, trail: 0, alive: true };
+    s.x = x; s.y = y; s.vx = vx; s.vy = vy; s.rocket = !!r; s.owner = tankById.get(o) || null; s.alive = true;
+    return s;
+  });
+  const oldMines = new Map(mines.map(q => [q.id, q]));
+  mines = m.mn.map(([id, x, y, left, o]) => {
+    const q = oldMines.get(id) || { id, alive: true };
+    q.x = x; q.y = y; q.fuse = 10; q.t = 10 - left / 10; q.owner = tankById.get(o) || null;
+    return q;
+  });
+  for (const v of m.ev || []) playEvent(v);
+  if (m.st !== state) {
+    if (m.st === 'world') unlockWorld(worldOf(mission) - 1);
+    if (m.st === 'win') unlockWorld(WORLDS.length - 1);
+    setState(m.st);
+  }
+  updateHud();
+}
+function updateGuest(dt) {
+  if (me) {
+    if (me.alive && state === 'play') updatePlayer(me, dt); else { me.vx = 0; me.vy = 0; me.cool -= dt; }
+    if (me.alive) { me.recoil = Math.max(0, me.recoil - dt * 6); moveTank(me, dt); }
+  }
+  const k = Math.min(1, dt * 14);
+  for (const t of tanks) {
+    if (t === me || !t.alive || t.tx == null) continue;
+    const dx = t.tx - t.x, dy = t.ty - t.y;
+    if (dx * dx + dy * dy > 120 * 120) { t.x = t.tx; t.y = t.ty; }
+    else { t.x += dx * k; t.y += dy * k; }
+    t.bodyAng += angDiff(t.bodyAng, t.tb) * k;
+    t.turretAng += angDiff(t.turretAng, t.tta) * k;
+    const mv = Math.hypot(dx, dy) * k;
+    t.trackDist += mv; t.treadPhase += mv;
+    if (t.trackDist > 9) { t.trackDist = 0; treads.push({ x: t.x, y: t.y, a: t.bodyAng, life: 8 }); if (treads.length > 900) treads.shift(); }
+    t.reveal = Math.max(0, t.reveal - dt);
+  }
+  for (const s of shells) {
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.trail -= dt;
+    if (s.trail <= 0) {
+      s.trail = s.rocket ? 0.012 : 0.03;
+      parts.push({ x: s.x - s.vx * 0.02, y: s.y - s.vy * 0.02, vx: rand(-8, 8), vy: rand(-8, 8), life: s.rocket ? 0.5 : 0.35, max: s.rocket ? 0.5 : 0.35, r: s.rocket ? 4 : 2.5, kind: s.rocket ? 'rsmoke' : 'trail' });
+    }
+  }
+  for (const q of mines) q.t += dt;
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+function clearInviteFromUrl() { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+async function startDuo() {
+  try { await net.host(); setState('lobby'); }
+  catch (e) { net.leave(false); toast("Couldn't start duos right now. Try again in a bit."); }
+}
+async function joinDuo() {
+  setState('joining');
+  try { await net.join(inviteCode); }
+  catch (e) { net.leave(false); lostMsg = "Couldn't connect. Check your internet and try the link again."; setState('lost'); }
+}
+function leaveDuo() {
+  net.leave(true);
+  inviteCode = ''; clearInviteFromUrl();
+  titleBackdrop();
+  setState('title');
+}
+net.onConnect = () => {
+  if (net.role === 'host') { toast('Your duo joined!'); sfx.mine(); renderOverlay(); }
+  else { toast('Connected!'); setState('lobby'); }
+};
+net.onLost = was => {
+  if (was === 'host') {
+    if (player2) { tanks = tanks.filter(t => t !== player2); player2 = null; }
+    toast('Your duo left. You are playing solo now.');
+    if (state === 'lobby') setState('title'); else renderOverlay();
+  } else {
+    lostMsg = 'Lost connection to your duo.';
+    titleBackdrop(); setState('lost');
+  }
+};
+net.onFail = why => {
+  net.leave(false);
+  lostMsg = why === 'full' ? 'That game already has two players.' : "Couldn't find that game. Ask your duo for a fresh link.";
+  setState('lost');
+};
+window.addEventListener('pagehide', () => { if (net.connected) net.send({ t: 'bye' }); });
+
 // title backdrop: show mission 1 layout
+function titleBackdrop() {
+  mission = 0; attempt = 0;
+  buildGrid(); drawBg();
+  tanks = []; shells = []; mines = []; parts = []; treads = []; scorches = [];
+  LEVELS[0].e.forEach(d => tanks.push(makeTank(d[0], d[1], d[2])));
+  player = makeTank('player', LEVELS[0].p[0], LEVELS[0].p[1]); tanks.push(player);
+  me = player; player2 = null;
+  updateHud();
+}
 fit();
-buildGrid(); drawBg();
-tanks = [];
-LEVELS[0].e.forEach(d => tanks.push(makeTank(d[0], d[1], d[2])));
-player = makeTank('player', LEVELS[0].p[0], LEVELS[0].p[1]); tanks.push(player);
-updateHud();
+titleBackdrop();
 hud.store.href = BRAND.store; hud.store.textContent = BRAND.store.replace(/^https?:\/\//, '') + ' ↗';
 const splash = document.getElementById('splash');
 const bareHost = h => h.replace(/^www\./, '');
@@ -1408,11 +1847,16 @@ if (onStoreSite) {
 setTimeout(() => splash.classList.add('out'), 350);
 window.addEventListener('pageshow', e => { if (e.persisted) splash.classList.add('out'); });
 setMute(muted); setMusic(musicOn); musicReady = true;
+try { inviteCode = (new URLSearchParams(location.search).get('duo') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); } catch (e) {}
 setState('title');
+net.checkAvailable().then(ok => {
+  if (ok && inviteCode && state === 'title') setState('join');
+  else if (ok && state === 'title') renderOverlay();
+});
 requestAnimationFrame(frame);
 
 // expose for testing
-window.__rt = { get state() { return state; }, LEVELS, TYPES, step: update, setState, startGame, get tanks() { return tanks; }, get player() { return player; }, get grid() { return grid; }, set mission(v) { mission = v; }, newMission };
+window.__rt = { get state() { return state; }, LEVELS, TYPES, step: update, setState, startGame, get tanks() { return tanks; }, get player() { return player; }, get player2() { return player2; }, get me() { return me; }, get grid() { return grid; }, set mission(v) { mission = v; }, get mission() { return mission; }, get lives() { return lives; }, newMission, net, beginPlay, togglePause, shoot, dropMine, mouse, keys, get shells() { return shells; } };
 })();
 </script>
 </body>
