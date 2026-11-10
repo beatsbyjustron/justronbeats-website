@@ -635,6 +635,7 @@ hud.music.addEventListener('click', () => { audio(); setMusic(!musicOn); hud.mus
 let grid = null, flow = null, flowTile = -1;
 let tanks = [], shells = [], mines = [], parts = [], treads = [], scorches = [];
 let player = null, player2 = null, me = null, attempt = 0, gridV = 0, nextId = 1, netEvents = [], lostMsg = '', inviteCode = '';
+let runStart = 0, board = null, boardAvail = false, boardReturn = 'title', postState = 'idle', boardRank = null;
 let levelAlive = [], mission = 0, lives = 3, score = 0, kills = 0, missionKills = {};
 let state = 'title', stateT = 0, shake = 0, time = 0, best = 0;
 try { best = parseInt(localStorage.getItem('rt_best') || '0', 10) || 0; } catch (e) {}
@@ -1103,6 +1104,7 @@ function setState(s) {
   renderOverlay();
   syncMusic();
   if (s === 'intro' && prev !== 'paused' && !(customBeat || beatBuf())) music.jingle();
+  if ((s === 'over' || s === 'win') && prev !== s && postState === 'idle') submitScore();
   hud.pause.disabled = !(s === 'play' || s === 'paused');
   hud.pause.textContent = s === 'paused' ? 'Resume' : 'Pause';
   updateNowPlaying();
@@ -1112,6 +1114,7 @@ function togglePause() { if (net.role === 'guest') { net.send({ t: 'pause' }); r
 
 function startGame(from = 0) {
   mission = Math.max(0, Math.min(LEVELS.length - 1, from)); lives = 3; score = 0; kills = 0;
+  runStart = mission; postState = 'idle'; boardRank = null;
   track('tanks_game_start', { from_mission: mission + 1 });
   music.resetBeat();
   newMission();
@@ -1167,10 +1170,12 @@ function renderOverlay() {
       ${IOS && !STANDALONE ? '<p class="small touchhelp">Tip: tap Share, then <b>Add to Home Screen</b>, to play full screen.</p>' : ''}
       ${best ? `<p class="small">Best: reached mission ${best}</p>` : ''}
       <div class="row"><button class="btn" data-act="start">Start</button>${best > 1 ? `<button class="btn" data-act="continue">Continue · M${Math.min(best, LEVELS.length)}</button>` : ''}</div>
-      ${net.avail ? '<div class="row"><button class="btn2" data-act="duo">Play duos · invite a friend</button></div>' : ''}
+      ${net.avail || boardAvail ? `<div class="row">${net.avail ? '<button class="btn2" data-act="duo">Play duos · invite a friend</button>' : ''}${boardAvail ? '<button class="btn2" data-act="board">Leaderboard</button>' : ''}</div>` : ''}
       ${codesList()}
       ${ALLOW_OWN_BEAT ? beatSection() : ''}
     </div>`;
+  } else if (state === 'board') {
+    html = boardPanel();
   } else if (state === 'lobby' && net.role === 'host') {
     html = net.connected ? `<div class="panel">
       <h1>DUOS</h1>
@@ -1222,6 +1227,7 @@ function renderOverlay() {
       ${beatCard(state === 'win' ? 'The beat you finished on' : 'The beat you went down to')}
       ${codesList()}
       ${signupBox()}
+      ${leaderboardBox()}
       <div class="row"><button class="btn2" data-act="share">Share my score</button></div>
       <button class="btn" data-act="start">Play again</button>
     </div>`;
@@ -1246,6 +1252,18 @@ function renderOverlay() {
   overlay.innerHTML = html;
 }
 overlay.addEventListener('submit', e => {
+  const pf = e.target.closest && e.target.closest('[data-form="pname"]');
+  if (pf) {
+    e.preventDefault();
+    const msgEl = document.getElementById('pnameMsg');
+    const name = pf.pname.value.trim();
+    if (msgEl) msgEl.textContent = 'Saving…';
+    fetch(asset(LB.name), { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name }) })
+      .then(r => r.json().then(j => [r.ok, j]))
+      .then(([ok, j]) => { if (!ok) { if (msgEl) msgEl.textContent = j.error || "Couldn't save that name."; return; } postState = 'idle'; submitScore(); })
+      .catch(() => { if (msgEl) msgEl.textContent = "Couldn't save that name."; });
+    return;
+  }
   const f = e.target.closest('[data-form="signup"]');
   if (!f) return;
   e.preventDefault();
@@ -1291,6 +1309,8 @@ overlay.addEventListener('click', e => {
   if (act === 'savebeat') saveCurrentBeat();
   if (act === 'share') shareScore(b);
   if (net.role === 'guest') return;
+  if (act === 'board') { boardReturn = state === 'board' ? boardReturn : state; loadBoard().then(() => setState('board')); return; }
+  if (act === 'back') { setState(boardReturn || 'title'); return; }
   if (act === 'start') startGame();
   if (act === 'continue') startGame(best - 1);
   if (act === 'restart') startAttempt();
@@ -1540,7 +1560,7 @@ function update(dt) {
   net.tick(dt);
   if (net.role === 'guest') { updateGuest(dt); return; }
 
-  if (['title', 'over', 'win', 'paused', 'world', 'lobby', 'join', 'joining', 'lost'].includes(state)) return;
+  if (['title', 'over', 'win', 'paused', 'world', 'lobby', 'join', 'joining', 'lost', 'board'].includes(state)) return;
 
   if (state === 'intro') { if (stateT > 2.6) setState('play'); return; }
 
@@ -1988,7 +2008,7 @@ const net = (() => {
 
 function makeSnap(full) {
   const snap = {
-    t: 's', st: state, m: mission, bt: missionBeat ? missionBeat.id : null, l: lives, sc: score, k: kills, at: attempt, g: gridV,
+    t: 's', st: state, m: mission, rs: runStart, bt: missionBeat ? missionBeat.id : null, l: lives, sc: score, k: kills, at: attempt, g: gridV,
     la: levelAlive.map(v => (v ? 1 : 0)),
     tk: tanks.map(t => [t.id, t.type, Math.round(t.x), Math.round(t.y), Math.round(t.bodyAng * 100), Math.round(t.turretAng * 100), t.alive ? 1 : 0, t.reveal > 0.25 ? 1 : 0, t.hp, t.hurt > 0 ? 1 : 0]),
     sh: shells.filter(s => s.alive).map(s => [s.id, Math.round(s.x), Math.round(s.y), Math.round(s.vx), Math.round(s.vy), s.rocket ? 1 : 0, s.owner ? s.owner.id : 0]),
@@ -2017,6 +2037,8 @@ function hostOnMsg(m) {
 function guestOnMsg(m) { if (m.t === 's') applySnap(m); }
 function applySnap(m) {
   if (m.m !== mission) mission = m.m;
+  if (m.rs != null) runStart = m.rs;
+  if (m.st !== state && (m.st === 'intro' || m.st === 'play') && (state === 'over' || state === 'win' || state === 'lobby')) { postState = 'idle'; boardRank = null; }
   const bt = m.bt || null;
   if (bt !== (missionBeat ? missionBeat.id : null)) {
     missionBeat = bt && catalog ? catalog.find(b => b.id === bt) || null : null;
@@ -2139,6 +2161,70 @@ function track(event, props) {
     else if (analyticsQueue.length < 50) analyticsQueue.push([event, p]);
   } catch (e) {}
 }
+// ---- weekly leaderboard (store accounts)
+const LB = { board: '/api/tanks/leaderboard', score: '/api/tanks/score', name: '/api/tanks/name' };
+function authHeaders() {
+  const s = storeSession();
+  const h = { 'Content-Type': 'application/json' };
+  if (s) h.Authorization = 'Bearer ' + s.access_token;
+  return h;
+}
+function loadBoard() {
+  return fetch(asset(LB.board), { headers: authHeaders() })
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => { if (j && Array.isArray(j.top)) { board = j; boardAvail = true; } return board; })
+    .catch(() => null);
+}
+function submitScore() {
+  if (!boardAvail) return;
+  const cleared = state === 'win' ? LEVELS.length : mission;
+  if (runStart > 0) { postState = 'continued'; renderOverlay(); return; }
+  if (!storeSession()) { postState = 'signin'; renderOverlay(); return; }
+  postState = 'posting'; renderOverlay();
+  fetch(asset(LB.score), { method: 'POST', headers: authHeaders(), body: JSON.stringify({ cleared, score, duo: !!net.connected }) })
+    .then(r => r.json().then(j => [r.status, j]))
+    .then(([status, j]) => {
+      if (status === 401) { postState = 'signin'; renderOverlay(); return; }
+      if (status !== 200) { postState = 'error'; renderOverlay(); return; }
+      if (j.needsName) { postState = 'needsName'; renderOverlay(); return; }
+      return loadBoard().then(b => {
+        boardRank = b && b.me ? b.me.rank : null;
+        postState = 'posted'; renderOverlay();
+        track('tanks_score_posted', { cleared, score, rank: boardRank });
+      });
+    })
+    .catch(() => { postState = 'error'; renderOverlay(); });
+}
+function leaderboardBox() {
+  if (!boardAvail || postState === 'idle') return '';
+  const link = `<a href="${esc(BRAND.store.replace(/\/$/, ''))}/account" target="_blank" rel="noopener">${esc(BRAND.store.replace(/^https?:\/\//, ''))}/account</a>`;
+  const view = net.role === 'guest' ? '' : ' <button class="btn2" data-act="board">View leaderboard</button>';
+  const msg = {
+    posting: '<p class="small"><span class="pulse"></span>Posting your score…</p>',
+    posted: `<p>${boardRank ? `You're <b>#${boardRank}</b> on this week's leaderboard.` : 'Your score is on this week\'s leaderboard.'}${view}</p>`,
+    signin: `<p class="small">Sign in at ${link} to get on the weekly leaderboard.</p>`,
+    continued: '<p class="small">Continued runs don\'t count for the leaderboard. Start from mission 1 to get on it.</p>',
+    error: '<p class="small">Couldn\'t post your score right now.</p>',
+    needsName: `<div class="card" style="margin-top:10px">Pick a player name for the leaderboard
+      <form class="signup" data-form="pname"><input name="pname" maxlength="16" required placeholder="3 to 16 letters or numbers" autocomplete="off"><button class="btn2" type="submit" style="margin:0">Save</button></form>
+      <div class="small" id="pnameMsg"></div></div>`
+  }[postState] || '';
+  return msg;
+}
+function boardPanel() {
+  const rows = board && board.top && board.top.length
+    ? board.top.slice(0, 10).map(r => `<tr${r.me ? ' style="color:#bef264"' : ''}><td>#${r.rank}</td><td style="text-align:left">${esc(r.name)}${r.duo ? ' <span class="small">duo</span>' : ''}</td><td>${r.cleared === LEVELS.length ? 'All clear' : 'Cleared ' + r.cleared}</td><td>${r.score}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="small" style="padding:14px">No scores yet this week. Be the first.</td></tr>';
+  const me = board && board.me;
+  const mine = me && me.rank && me.rank > 10 ? `<p class="small">You're #${me.rank} this week (${me.name}).</p>` : (me && !me.name ? '<p class="small">Finish a run from mission 1 to get on the board.</p>' : '');
+  return `<div class="panel" style="min-width:min(460px,90vw)">
+    <h2>THIS WEEK'S TOP TANKS</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:6px"><thead><tr class="small"><th>#</th><th style="text-align:left">Player</th><th>Missions</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table>
+    ${mine}
+    <p class="small">Resets every Monday. Only runs from mission 1 count.</p>
+    <div class="row"><button class="btn" data-act="back">Back</button></div>
+  </div>`;
+}
 let toastTimer = null;
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -2220,6 +2306,7 @@ setMute(muted); setMusic(musicOn); musicReady = true;
 try { inviteCode = (new URLSearchParams(location.search).get('duo') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); } catch (e) {}
 setState('title');
 loadCatalog().then(() => { if (state === 'title') renderOverlay(); });
+loadBoard().then(() => { if (state === 'title') renderOverlay(); });
 net.checkAvailable().then(ok => {
   if (ok && inviteCode && state === 'title') setState('join');
   else if (ok && state === 'title') renderOverlay();
