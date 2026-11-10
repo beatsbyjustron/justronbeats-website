@@ -33,13 +33,24 @@ export function ReleaseSpotlightRotator({
   btsUrl,
 }: ReleaseSpotlightRotatorProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  // bumped on every manual jump so the auto-advance timer starts over
+  const [timerKey, setTimerKey] = useState(0);
+  const slideCount = SLIDE_INDEXES.length;
+  const slideLabels = [releaseTitle || "Newest release", "Justron Tanks", "Behind the scenes"];
 
   useEffect(() => {
+    if (paused) return;
     const interval = window.setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % SLIDE_INDEXES.length);
+      setActiveIndex((prev) => (prev + 1) % slideCount);
     }, 4500);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [paused, timerKey, slideCount]);
+
+  const goTo = (index: number) => {
+    setActiveIndex(((index % slideCount) + slideCount) % slideCount);
+    setTimerKey((key) => key + 1);
+  };
 
   const primaryHref = releaseLinks[0]?.href;
 
@@ -55,6 +66,11 @@ export function ReleaseSpotlightRotator({
       initial={{ boxShadow: spotlightGlow[0] }}
       animate={{ boxShadow: [...spotlightGlow] }}
       transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      aria-roledescription="carousel"
     >
       <div className="grid">
         {SLIDE_INDEXES.map((slideIndex) => {
@@ -224,6 +240,44 @@ export function ReleaseSpotlightRotator({
         </motion.div>
           );
         })}
+      </div>
+
+      <div className="relative z-20 mt-5 flex items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={() => goTo(activeIndex - 1)}
+          aria-label="Previous"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-lime-200/30 bg-black/40 text-lime-100 transition hover:border-lime-200/60 hover:bg-lime-300/10"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m15 6-6 6 6 6" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2">
+          {SLIDE_INDEXES.map((slideIndex) => (
+            <button
+              key={slideIndex}
+              type="button"
+              onClick={() => goTo(slideIndex)}
+              aria-label={`Show ${slideLabels[slideIndex]}`}
+              aria-current={activeIndex === slideIndex}
+              title={slideLabels[slideIndex]}
+              className={`h-2 rounded-full transition-all ${
+                activeIndex === slideIndex ? "w-6 bg-lime-300" : "w-2 bg-zinc-600 hover:bg-zinc-400"
+              }`}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => goTo(activeIndex + 1)}
+          aria-label="Next"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-lime-200/30 bg-black/40 text-lime-100 transition hover:border-lime-200/60 hover:bg-lime-300/10"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </button>
       </div>
     </motion.section>
   );
