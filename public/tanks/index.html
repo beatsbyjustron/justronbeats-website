@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Justron Tanks</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Cdefs%3E%3ClinearGradient id="fv" x1="0" y1="0" x2="1" y2="1"%3E%3Cstop offset="0" stop-color="#34d399"/%3E%3Cstop offset=".55" stop-color="#bef264"/%3E%3Cstop offset="1" stop-color="#fde047"/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d="M50 4 V22 M50 78 V96 M4 50 H22 M78 50 H96" stroke="url(#fv)" stroke-width="6" stroke-linecap="round"/%3E%3Ccircle cx="50" cy="50" r="31" fill="#111114"/%3E%3Ccircle cx="50" cy="50" r="27" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/%3E%3Ccircle cx="50" cy="50" r="23.5" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/%3E%3Ccircle cx="50" cy="50" r="20" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/%3E%3Ccircle cx="50" cy="50" r="34" fill="none" stroke="url(#fv)" stroke-width="6"/%3E%3Ccircle cx="50" cy="50" r="14" fill="url(#fv)"/%3E%3Cpath d="M54.5 41 V52.5 A5.2 5.2 0 0 1 44 52.5" fill="none" stroke="#0a0a0a" stroke-width="4.6" stroke-linecap="round"/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&display=swap">
@@ -61,6 +61,37 @@
   .link{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#000;border:1px solid var(--line2);border-radius:12px;padding:10px 14px;margin:10px auto 4px;max-width:420px;word-break:break-all;color:var(--txt);user-select:all;-webkit-user-select:all}
   .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--em);margin-right:8px;animation:pl 1.2s infinite}
   @keyframes pl{0%,100%{opacity:.25}50%{opacity:1}}
+  /* ---- phone / touch ---- */
+  #touch{display:none}
+  body.touch.playing #touch{display:block}
+  #touch .stick{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));width:124px;height:124px;border-radius:50%;background:rgba(24,24,27,.55);border:1px solid rgba(255,255,255,.14);touch-action:none;z-index:40;-webkit-user-select:none;user-select:none}
+  #touch #stickL{left:calc(18px + env(safe-area-inset-left))}
+  #touch #stickR{right:calc(18px + env(safe-area-inset-right));border-color:rgba(190,242,100,.35)}
+  #touch .knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(244,244,245,.85);box-shadow:0 4px 14px rgba(0,0,0,.5);pointer-events:none}
+  #touch #stickR .knob{background:#bef264}
+  #touch .lbl{position:absolute;left:0;right:0;top:-20px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.2em;color:#a1a1aa;pointer-events:none}
+  #touch #mineBtn{position:fixed;right:calc(36px + env(safe-area-inset-right));bottom:calc(166px + env(safe-area-inset-bottom));width:88px;height:44px;border-radius:999px;border:1px solid rgba(253,224,71,.5);background:rgba(24,24,27,.75);color:#fde047;font:700 12px ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em;touch-action:none;z-index:40}
+  #rotate{display:none;position:fixed;inset:0;z-index:60;background:#000;color:var(--txt);flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+  #rotate svg{width:64px;height:64px}
+  @media (orientation: portrait){ body.touch #rotate{display:flex} }
+  .touchhelp{display:none}
+  body.touch .touchhelp{display:block}
+  body.touch .controls, body.touch .keyhint{display:none}
+  body.touch #hud{gap:10px;font-size:10px;height:26px}
+  body.touch #hud span b{font-size:12px}
+  body.touch #storeLink, body.touch #muteBtn{display:none}
+  @media (max-height: 560px){
+    .panel{padding:16px 22px;max-height:calc(100% - 12px);overflow:auto;-webkit-overflow-scrolling:touch}
+    .panel p{margin:5px 0;font-size:13px}
+    .panel h1.logo svg{width:52px;height:52px}
+    .logo .wm{font-size:26px}
+    .logo .tl{font-size:9px}
+    .btn{margin-top:8px;padding:9px 22px;font-size:13px}
+    .banner{padding:10px 0}
+    .banner h2{font-size:24px}
+    .card{margin-top:8px;padding:10px 12px}
+    .code{font-size:18px}
+  }
   .logo{display:flex;align-items:center;justify-content:center;gap:18px;margin:0 0 6px}
   .logo svg{flex-shrink:0}
   .logo .wm{font-family:'Chakra Petch',ui-sans-serif,system-ui,sans-serif;font-weight:700;font-size:40px;line-height:1;letter-spacing:.06em;color:var(--txt);text-align:left}
@@ -78,6 +109,8 @@
 </head>
 <body>
 <div id="splash"><div class="t logo"><svg viewBox="0 0 100 100" width="110" height="110" aria-hidden="true"><defs><linearGradient id="sp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset=".55" stop-color="#bef264"/><stop offset="1" stop-color="#fde047"/></linearGradient></defs><path d="M50 4 V22 M50 78 V96 M4 50 H22 M78 50 H96" stroke="url(#sp)" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="50" r="31" fill="#111114"/><circle cx="50" cy="50" r="27" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="23.5" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="20" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.2"/><circle cx="50" cy="50" r="34" fill="none" stroke="url(#sp)" stroke-width="6"/><circle cx="50" cy="50" r="14" fill="url(#sp)"/><path d="M54.5 41 V52.5 A5.2 5.2 0 0 1 44 52.5" fill="none" stroke="#0a0a0a" stroke-width="4.6" stroke-linecap="round"/></svg><div><div class="wm">JUSTRON <span>TANKS</span></div><div class="tl">PLAY TO THE BEAT</div></div></div></div>
+<div id="rotate"><svg viewBox="0 0 24 24" fill="none" stroke="#bef264" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M3 9a9 9 0 0 1 3-5M21 15a9 9 0 0 1-3 5"/></svg><div style="font-weight:700;font-size:18px">Turn your phone sideways</div><div class="small">Justron Tanks plays in landscape.</div></div>
+<div id="touch" aria-hidden="true"><div class="stick" id="stickL"><span class="lbl">DRIVE</span><div class="knob"></div></div><div class="stick" id="stickR"><span class="lbl">AIM · FIRE</span><div class="knob"></div></div><button id="mineBtn" type="button" tabindex="-1">MINE</button></div>
 <div id="wrap">
   <div id="hud">
     <span>Mission<b id="hMission">1</b></span>
@@ -193,7 +226,8 @@ const bg = document.createElement('canvas');
 let scale = 1;
 
 function fit() {
-  const maxW = window.innerWidth - 24, maxH = window.innerHeight - 30 - 8 - 24;
+  const touchMode = !!(document.body && document.body.classList && document.body.classList.contains('touch'));
+  const maxW = window.innerWidth - (touchMode ? 8 : 24), maxH = window.innerHeight - (touchMode ? 26 + 6 + 8 : 30 + 8 + 24);
   const s = Math.max(0.3, Math.min(maxW / W, maxH / H));
   const cw = Math.floor(W * s), ch = Math.floor(H * s);
   canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
@@ -854,8 +888,66 @@ canvas.addEventListener('mousedown', e => {
   const p = canvasPos(e); mouse.x = p.x; mouse.y = p.y;
   if (state === 'intro') { beginPlay(); return; }
   if (state !== 'play' || !me || !me.alive) return;
+  if (touch.on && e.button === 0) { me.turretAng = Math.atan2(p.y - me.y, p.x - me.x); shoot(); return; }
   if (e.button === 0) shoot();
   else if (e.button === 2) dropMine();
+});
+// ---- touch controls: two thumb sticks + mine button
+const touch = { on: false, move: { active: false, x: 0, y: 0 }, aim: { active: false, ang: 0, dragged: false } };
+function enableTouch() {
+  if (touch.on) return;
+  touch.on = true; mouse.inside = false;
+  document.body.classList.add('touch');
+  fit(); renderOverlay();
+}
+try { if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) setTimeout(enableTouch, 0); } catch (e) {}
+window.addEventListener('touchstart', enableTouch, { passive: true });
+function bindStick(el, onMove, onEnd, onStart) {
+  if (!el || !el.addEventListener) return;
+  const knob = el.querySelector ? el.querySelector('.knob') : null;
+  let id = null, cx = 0, cy = 0;
+  const R = 46;
+  const move = e => {
+    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const d = Math.hypot(dx, dy), f = d > R ? R / d : 1;
+    dx *= f; dy *= f;
+    if (knob) knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    onMove(dx / R, dy / R);
+  };
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); audio();
+    id = e.pointerId;
+    try { el.setPointerCapture(id); } catch (err) {}
+    const r = el.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+    if (onStart) onStart();
+    move(e);
+  });
+  el.addEventListener('pointermove', e => { if (e.pointerId === id) move(e); });
+  const end = e => {
+    if (e.pointerId !== id) return;
+    id = null;
+    if (knob) knob.style.transform = '';
+    onEnd();
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+bindStick(document.getElementById('stickL'),
+  (x, y) => { touch.move.active = true; touch.move.x = x; touch.move.y = y; },
+  () => { touch.move.active = false; touch.move.x = touch.move.y = 0; },
+  () => { if (state === 'intro') beginPlay(); });
+bindStick(document.getElementById('stickR'),
+  (x, y) => { if (Math.hypot(x, y) > 0.3) { touch.aim.active = true; touch.aim.dragged = true; touch.aim.ang = Math.atan2(y, x); } },
+  () => {
+    if (state === 'play' && me && me.alive) { if (touch.aim.active) me.turretAng = touch.aim.ang; shoot(); }
+    touch.aim.active = false; touch.aim.dragged = false;
+  },
+  () => { if (state === 'intro') beginPlay(); });
+const mineBtnEl = document.getElementById('mineBtn');
+if (mineBtnEl && mineBtnEl.addEventListener) mineBtnEl.addEventListener('pointerdown', e => {
+  e.preventDefault(); audio();
+  if (state === 'intro') beginPlay();
+  else if (state === 'play' && me && me.alive) dropMine();
 });
 function shoot() {
   if (me.cool > 0 || countShells(me) >= PLAYER_CFG.max) return;
@@ -870,6 +962,7 @@ function dropMine() {
 function setState(s) {
   const prev = state;
   state = s; stateT = 0;
+  if (document.body && document.body.classList) document.body.classList.toggle('playing', ['play', 'intro', 'cleared', 'dead'].includes(s));
   renderOverlay();
   syncMusic();
   if (s === 'intro' && prev !== 'paused' && !(customBeat || beatBuf())) music.jingle();
@@ -923,6 +1016,7 @@ function renderOverlay() {
       <h1 class="logo" aria-label="${esc(BRAND.name)}">${LOGO_MARK}<span><span class="wm" style="display:block">JUSTRON <span>TANKS</span></span><span class="tl" style="display:block">PLAY TO THE BEAT</span></span></h1>
       <p>${WORLDS.length} worlds. ${LEVELS.length} missions. ${catalog ? 'Every mission drops a random Justron beat from the store. Hear one you like? Save it or license it right from the game.' : 'Every world runs on a different Justron beat.'}</p>
       <p class="small">Your shells bounce once, so use the walls.</p>
+      <p class="small touchhelp">Left stick drives. Drag the right stick to aim and let go to fire, or tap the arena to shoot there. MINE drops a mine.</p>
       <div class="controls">
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows</span><span>Drive</span>
         <span>Mouse</span><span>Aim</span>
@@ -1117,11 +1211,13 @@ function updatePlayer(t, dt) {
     if (keys['s'] || keys['arrowdown']) iy += 1;
     if (keys['w'] || keys['arrowup']) iy -= 1;
   }
-  const l = Math.hypot(ix, iy);
-  const tvx = l ? ix / l * PLAYER_SPEED : 0, tvy = l ? iy / l * PLAYER_SPEED : 0;
+  if (state === 'play' && touch.move.active) { ix += touch.move.x; iy += touch.move.y; }
+  const l = Math.hypot(ix, iy), sp = l > 0.15 ? Math.min(1, l) / l * PLAYER_SPEED : 0;
+  const tvx = ix * sp, tvy = iy * sp;
   const k = Math.min(1, dt * 14);
   t.vx += (tvx - t.vx) * k; t.vy += (tvy - t.vy) * k;
-  t.turretAng = Math.atan2(mouse.y - t.y, mouse.x - t.x);
+  if (touch.on) { if (touch.aim.active) t.turretAng = touch.aim.ang; }
+  else t.turretAng = Math.atan2(mouse.y - t.y, mouse.x - t.x);
   t.cool -= dt;
 }
 
@@ -1527,6 +1623,15 @@ function render() {
     else if (p.kind === 'spark') { ctx.fillStyle = `rgba(255,230,140,${k})`; ctx.fillRect(p.x - 1, p.y - 1, 2.5, 2.5); }
     else if (p.kind === 'chip') { ctx.fillStyle = `rgba(150,142,132,${k})`; ctx.fillRect(p.x - 2, p.y - 2, 4, 4); }
     else if (p.kind === 'ring') { ctx.strokeStyle = `rgba(255,230,180,${k * 0.8})`; ctx.lineWidth = 4 * k + 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.15 - k * 0.8), 0, TAU); ctx.stroke(); }
+  }
+  // touch aim line
+  if (touch.on && touch.aim.active && me && me.alive && state === 'play') {
+    const yel = me.type === 'player2';
+    ctx.save(); ctx.setLineDash([4, 8]); ctx.lineDashOffset = -time * 30;
+    ctx.strokeStyle = yel ? 'rgba(253,224,71,.6)' : 'rgba(52,211,153,.6)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(me.x + Math.cos(me.turretAng) * 26, me.y + Math.sin(me.turretAng) * 26);
+    ctx.lineTo(me.x + Math.cos(me.turretAng) * 240, me.y + Math.sin(me.turretAng) * 240); ctx.stroke();
+    ctx.restore();
   }
   // aim line + reticle
   if (me && me.alive && (state === 'play') && mouse.inside) {
