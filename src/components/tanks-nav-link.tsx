@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type MouseEvent } from "react";
+import { useEffect, type MouseEvent, type ReactNode } from "react";
 
 const GRADIENT = "linear-gradient(90deg,#34d399,#bef264,#fde047)";
 
@@ -18,7 +18,15 @@ function reducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function TanksNavLink({ className }: { className?: string }) {
+export function TanksNavLink({
+  className,
+  children = "Tanks",
+  tabIndex,
+}: {
+  className?: string;
+  children?: ReactNode;
+  tabIndex?: number;
+}) {
   useEffect(() => {
     // Warm the game so it opens instantly.
     const prefetch = document.createElement("link");
@@ -72,8 +80,8 @@ export function TanksNavLink({ className }: { className?: string }) {
   }
 
   return (
-    <a href="/tanks" onClick={go} className={className}>
-      Tanks
+    <a href="/tanks" onClick={go} className={className} tabIndex={tabIndex}>
+      {children}
     </a>
   );
 }

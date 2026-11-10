@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { TanksNavLink } from "@/components/tanks-nav-link";
 
 type LinkItem = {
   label: string;
@@ -19,7 +20,9 @@ type ReleaseSpotlightRotatorProps = {
   btsUrl: string;
 };
 
-const SLIDE_INDEXES = [0, 1] as const;
+// 0 = newest release, 1 = Justron Tanks, 2 = behind the scenes
+const SLIDE_INDEXES = [0, 1, 2] as const;
+const TANKS_COVER = "/tanks/cover.jpg";
 
 export function ReleaseSpotlightRotator({
   coverUrl,
@@ -33,7 +36,7 @@ export function ReleaseSpotlightRotator({
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % 2);
+      setActiveIndex((prev) => (prev + 1) % SLIDE_INDEXES.length);
     }, 4500);
     return () => window.clearInterval(interval);
   }, []);
@@ -56,8 +59,14 @@ export function ReleaseSpotlightRotator({
       <div className="grid">
         {SLIDE_INDEXES.map((slideIndex) => {
           const slideIsRelease = slideIndex === 0;
+          const slideIsTanks = slideIndex === 1;
           const isActive = activeIndex === slideIndex;
-          const slideCoverAlt = slideIsRelease ? `${releaseTitle} cover art` : `${releaseTitle} - behind the scenes`;
+          const slideCoverAlt = slideIsTanks
+            ? "Justron Tanks gameplay"
+            : slideIsRelease
+              ? `${releaseTitle} cover art`
+              : `${releaseTitle} - behind the scenes`;
+          const slideCover = slideIsTanks ? TANKS_COVER : coverUrl;
 
           return (
         <motion.div
@@ -71,9 +80,9 @@ export function ReleaseSpotlightRotator({
           }`}
         >
           <div className="relative shrink-0">
-            {coverUrl ? (
+            {slideCover ? (
               <img
-                src={coverUrl}
+                src={slideCover}
                 alt={slideCoverAlt}
                 className="h-44 w-44 rounded-xl border border-lime-200/30 object-cover shadow-lg sm:h-56 sm:w-56"
               />
@@ -89,7 +98,16 @@ export function ReleaseSpotlightRotator({
 
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-4">
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start">
-              {slideIsRelease ? (
+              {slideIsTanks ? (
+                <>
+                  <span className="inline-flex items-center rounded-full border border-lime-200/50 bg-lime-300/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-lime-100">
+                    New
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-lime-200/90">
+                    Play now · free
+                  </span>
+                </>
+              ) : slideIsRelease ? (
                 <>
                   <span className="inline-flex items-center rounded-full border border-lime-200/50 bg-lime-300/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-lime-100">
                     Out now
@@ -106,7 +124,19 @@ export function ReleaseSpotlightRotator({
             </div>
 
             <div className="space-y-2">
-              {slideIsRelease ? (
+              {slideIsTanks ? (
+                <>
+                  <h2 className="text-balance text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl lg:text-[2.35rem] lg:leading-tight">
+                    Justron Tanks
+                  </h2>
+                  <p className="text-lg font-semibold tracking-tight text-lime-100/95 sm:text-xl">
+                    A tank game scored by Justron beats
+                  </p>
+                  <p className="mx-auto max-w-xl text-pretty text-sm leading-relaxed text-zinc-300 lg:mx-0 sm:text-base">
+                    5 worlds, 25 missions, a different beat in every world. Play solo or send a friend a link and run it as duos.
+                  </p>
+                </>
+              ) : slideIsRelease ? (
                 <>
                   <h2 className="text-balance text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl lg:text-[2.35rem] lg:leading-tight">
                     {releaseTitle}
@@ -132,7 +162,14 @@ export function ReleaseSpotlightRotator({
             </div>
 
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center lg:justify-start">
-              {slideIsRelease ? (
+              {slideIsTanks ? (
+                <TanksNavLink
+                  tabIndex={isActive ? undefined : -1}
+                  className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-lime-300 px-8 text-base font-bold text-zinc-950 shadow-[0_0_32px_-4px_rgba(190,242,100,0.55)] transition hover:bg-lime-200 hover:shadow-[0_0_40px_-2px_rgba(217,249,157,0.65)]"
+                >
+                  Play now
+                </TanksNavLink>
+              ) : slideIsRelease ? (
                 <>
                   {primaryHref ? (
                     <a
