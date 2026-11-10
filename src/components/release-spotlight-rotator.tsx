@@ -149,7 +149,7 @@ export function ReleaseSpotlightRotator({
                     A tank game scored by Justron beats
                   </p>
                   <p className="mx-auto max-w-xl text-pretty text-sm leading-relaxed text-zinc-300 lg:mx-0 sm:text-base">
-                    5 worlds, 25 missions, a different beat in every world. Play solo or send a friend a link and run it as duos.
+                    25 missions, and every one drops a random Justron beat. Hear one you like? Save it or license it mid-game. Play solo or send a friend a link and run it as duos.
                   </p>
                 </>
               ) : slideIsRelease ? (
