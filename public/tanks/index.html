@@ -54,9 +54,16 @@
   .signup input:focus{border-color:var(--em)}
   #np{position:absolute;left:10px;bottom:10px;background:rgba(9,9,11,.85);border:1px solid var(--line2);border-radius:999px;padding:5px 12px;font-size:12px;color:var(--muted);display:none;pointer-events:auto;cursor:default;max-width:70%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #np b{color:var(--txt)}
+  #splash{position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .6s ease}
+  #splash .t{font-size:44px;font-weight:800;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;transition:transform .6s ease}
+  #splash .s{font-size:12px;letter-spacing:.4em;text-transform:uppercase;color:var(--dim)}
+  #splash.out{opacity:0;pointer-events:none}
+  #splash.out .t{transform:scale(1.06)}
+  @media (prefers-reduced-motion:reduce){#splash,#splash .t{transition:none}}
 </style>
 </head>
 <body>
+<div id="splash"><div class="t">JUSTRON TANKS</div><div class="s">prod. justron</div></div>
 <div id="wrap">
   <div id="hud">
     <span>Mission<b id="hMission">1</b></span>
@@ -785,7 +792,7 @@ function renderOverlay() {
         <span><kbd>P</kbd> / <kbd>Esc</kbd></span><span>Pause</span>
         <span><kbd>N</kbd> / <kbd>M</kbd></span><span>Music / all sound</span>
       </div>
-      <p class="small">Mines break cork blocks and anything nearby, including you. Shells fly over pits.</p>
+      <p class="small">Mines break the cracked blocks and anything nearby, including you. Shells fly over pits.</p>
       ${best ? `<p class="small">Best: reached mission ${best}</p>` : ''}
       <div class="row"><button class="btn" data-act="start">Start</button>${best > 1 ? `<button class="btn" data-act="continue">Continue · M${Math.min(best, LEVELS.length)}</button>` : ''}</div>
       ${codesList()}
@@ -1288,7 +1295,7 @@ function render() {
   }
   // tread marks
   for (const t of treads) {
-    const a = Math.min(1, t.life / 3) * 0.07;
+    const a = Math.min(1, t.life / 3) * 0.05;
     ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.a);
     ctx.fillStyle = `rgba(255,255,255,${a})`;
     ctx.fillRect(-2, -15, 4, 6); ctx.fillRect(-2, 9, 4, 6);
@@ -1380,6 +1387,26 @@ LEVELS[0].e.forEach(d => tanks.push(makeTank(d[0], d[1], d[2])));
 player = makeTank('player', LEVELS[0].p[0], LEVELS[0].p[1]); tanks.push(player);
 updateHud();
 hud.store.href = BRAND.store; hud.store.textContent = BRAND.store.replace(/^https?:\/\//, '') + ' ↗';
+const splash = document.getElementById('splash');
+const bareHost = h => h.replace(/^www\./, '');
+let onStoreSite = false;
+try { onStoreSite = bareHost(location.hostname) === bareHost(new URL(BRAND.store).hostname); } catch (e) {}
+if (onStoreSite) {
+  hud.store.textContent = '← Back to store';
+  hud.store.removeAttribute('target');
+  hud.store.addEventListener('click', e => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    if (state === 'play') togglePause();
+    music.stop();
+    try { sessionStorage.setItem('jt_exit', String(Date.now())); } catch (err) {}
+    splash.classList.remove('out');
+    setTimeout(() => { location.href = '/'; }, 550);
+  });
+}
+// fade in from the black title card (matches the store's exit transition)
+setTimeout(() => splash.classList.add('out'), 350);
+window.addEventListener('pageshow', e => { if (e.persisted) splash.classList.add('out'); });
 setMute(muted); setMusic(musicOn); musicReady = true;
 setState('title');
 requestAnimationFrame(frame);
