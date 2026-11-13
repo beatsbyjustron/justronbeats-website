@@ -313,6 +313,7 @@ function genMap(m, roster, rng, primary) {
   if (!early && rng() < 0.6) S[rng.pick(['pillars', 'crosses', 'elbows', 'checker', 'bunkers'])]();
   if (m >= 3 && primary !== 'river') for (let n = rng.int(0, m < 15 ? 1 : 3); n--;) { const x = rng.int(3, 10), y = rng.int(1, 14); if (!g[y][x]) put(x, y, 3); }
   for (let n = rng.int(0, 3); n--;) { const x = rng.int(3, 11), y = rng.int(0, 15); if (!g[y][x]) put(x, y, 2); }
+  if (Math.floor(m / 5) === 8) for (let n = rng.int(3, 5); n--;) { const x = rng.int(3, 10), y = rng.int(1, 14); if (!g[y][x]) put(x, y, 3); }
   // symmetry: mirror left/right, spin it 180°, or mirror both ways
   const sym = primary === 'river' || primary === 'corkwall' ? rng.pick(['mirror', 'spin']) : rng.pick(['mirror', 'mirror', 'spin', 'spin', 'quad']);
   if (sym === 'quad') for (let y = 0; y < ROWS / 2; y++) for (let x = 0; x < HW; x++) g[ROWS - 1 - y][x] = g[y][x];
@@ -501,6 +502,8 @@ const sfx = {
   beep: () => tone(1200, 0.04, 'square', 0.025),
   clear: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'square', 0.05, 0, i * 0.12)),
   lose: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.22, 'triangle', 0.07, 0, i * 0.16)),
+  power: () => [660, 880, 1175].forEach((f, i) => tone(f, 0.09, 'triangle', 0.05, 0, i * 0.06)),
+  erupt: () => { noise(0.5, 0.3, 500); tone(70, 0.4, 'sine', 0.15, -30); },
 };
 // ---------- Music: original adaptive cinematic score ----------
 let musicOn = true, musicReady = false, customBeat = null, customName = '', beatMsg = '';
@@ -775,7 +778,7 @@ function emit(v) { if (net.role === 'host' && net.connected) { netEvents.push(v)
 
 function buildGrid() {
   grid = new Uint8Array(COLS * ROWS);
-  for (const [x, y, w, h, t] of LEVELS[mission].w)
+  for (const [x, y, w, h, t] of lvl().w)
     for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++)
       if (xx >= 0 && yy >= 0 && xx < COLS && yy < ROWS) grid[yy * COLS + xx] = t === 'x' ? 2 : t === 'o' ? 3 : 1;
   gridV++;
@@ -876,15 +879,18 @@ function unlockWorld(i) {
 function newMission() {
   if (net.role !== 'guest') pickMissionBeat();
   loadBeat(curBeat()); loadBeat(upcomingBeat());
-  levelAlive = LEVELS[mission].e.map(() => true);
-  missionKills = {};
-  startAttempt();
+  levelAlive = lvl().e.map(() => true);
+  missionKills = {}; missionDeaths = 0; lastStars = null;
+  startAttempt(true);
 }
 
-function startAttempt() {
+function startAttempt(fresh) {
+  if (!fresh) missionDeaths++;
+  missionTime = 0; missionShots = 0;
   buildGrid();
+  setupMechanics();
   tanks = []; shells = []; mines = []; parts = []; treads = []; scorches = [];
-  const L = LEVELS[mission];
+  const L = lvl();
   player = makeTank('player', L.p[0], L.p[1]);
   tanks.push(player);
   me = player; player2 = null; attempt++;
@@ -985,10 +991,13 @@ function fire(t, ang) {
   const mx = t.x + Math.cos(ang) * reach, my = t.y + Math.sin(ang) * reach;
   t.cool = c.cd; t.recoil = 1; t.reveal = 0.35;
   if (shellSolid(mx, my)) { puff(mx, my, true); return; }
-  const spread = c.burst ? [-0.16, 0, 0.16] : [0];
+  const tri = t.isPlayer && pu(t, 'triple'), bank = t.isPlayer && !!challenge && challenge.twist === 'bank';
+  const spread = c.burst ? [-0.16, 0, 0.16] : tri ? [-0.13, 0, 0.13] : [0];
+  const bn = c.bounces + (t.isPlayer && pu(t, 'bounce') ? 2 : 0) + (bank ? 1 : 0);
+  if (t.isPlayer) missionShots++;
   for (const da of spread) {
     const a2 = ang + da;
-    shells.push({ id: nextId++, x: mx, y: my, vx: Math.cos(a2) * c.shell, vy: Math.sin(a2) * c.shell, b: c.bounces, owner: t, age: 0, rocket: !!c.rocket, alive: true, trail: 0 });
+    shells.push({ id: nextId++, x: mx, y: my, vx: Math.cos(a2) * c.shell, vy: Math.sin(a2) * c.shell, b: bn, owner: t, age: 0, rocket: !!c.rocket, alive: true, trail: 0, bank });
   }
   fxFire(mx, my, ang, !!c.rocket, t.isPlayer);
   emit({ e: 'f', x: Math.round(mx), y: Math.round(my), a: +ang.toFixed(2), r: c.rocket ? 1 : 0, p: t.isPlayer ? 1 : 0 });
@@ -1036,6 +1045,11 @@ function playEvent(v) {
   else if (v.e === 'm') sfx.mine();
   else if (v.e === 'clr') sfx.clear();
   else if (v.e === 'lose') sfx.lose();
+  else if (v.e === 'pu') { fxPower(v.x, v.y, v.k); if (me && v.id === me.id) toast(PU[v.k].name + '!'); }
+  else if (v.e === 'sh') fxShield(v.x, v.y);
+  else if (v.e === 'lw') hazards.push({ x: v.x, y: v.y, t: 0, life: 1.3 });
+  else if (v.e === 'le') fxErupt(v.x, v.y);
+  else if (v.e === 'st') { lastStars = { s: v.s.map(Boolean), time: v.tm, par: v.pr, shots: v.sh, parShots: v.ps }; saveStars(mission, v.s.filter(Boolean).length); }
 }
 
 function layMine(t) {
@@ -1054,6 +1068,7 @@ function puff(x, y, snd) {
 // Bosses take several hits; everything else dies in one
 function hitTank(t, dmg) {
   if (!t.alive) return;
+  if (t.pu && t.pu.shield > 0) { t.pu.shield = 0; t.hurt = 0.3; fxShield(t.x, t.y); emit({ e: 'sh', x: Math.round(t.x), y: Math.round(t.y) }); if (t === me) toast('Shield used up'); return; }
   if (t.hp > dmg) {
     t.hp -= dmg; t.hurt = 0.3;
     fxPuff(t.x, t.y, true); shake = Math.max(shake, 5); sfx.small();
@@ -1210,7 +1225,7 @@ if (mineBtnEl && mineBtnEl.addEventListener) mineBtnEl.addEventListener('pointer
   else if (state === 'play' && me && me.alive) dropMine();
 });
 function shoot() {
-  if (me.cool > 0 || countShells(me) >= PLAYER_CFG.max) return;
+  if (me.cool > 0 || countShells(me) >= maxShells(me)) return;
   if (net.role === 'guest') { me.cool = PLAYER_CFG.cd; net.send({ t: 'fire', a: +me.turretAng.toFixed(3) }); }
   else fire(me, me.turretAng);
 }
@@ -1235,6 +1250,7 @@ function beginPlay() { music.cutJingle(); if (net.role === 'guest') { net.send({
 function togglePause() { if (net.role === 'guest') { net.send({ t: 'pause' }); return; } setState(state === 'paused' ? 'play' : 'paused'); }
 
 function startGame(from = 0) {
+  challenge = null;
   mission = Math.max(0, Math.min(LEVELS.length - 1, from)); lives = 3; score = 0; kills = 0;
   runStart = mission; postState = 'idle'; boardRank = null;
   track('tanks_game_start', { from_mission: mission + 1 });
@@ -1290,14 +1306,19 @@ function renderOverlay() {
       </div>
       <p class="small notouch">Mines break the cracked blocks and anything nearby, including you. Shells fly over pits.</p>
       ${IOS && !STANDALONE ? '<p class="small touchhelp">Tip: tap Share, then <b>Add to Home Screen</b>, to play full screen.</p>' : ''}
-      ${best ? `<p class="small">Best: reached mission ${best}</p>` : ''}
+      ${best ? `<p class="small">Best: reached mission ${best}${totalStars() ? ` · <span style="color:#fde047">★ ${totalStars()}/${LEVELS.length * 3}</span> stars this week` : ''}</p>` : ''}
       <div class="row"><button class="btn" data-act="start">Start</button>${best > 1 ? `<button class="btn" data-act="continue">Continue · M${Math.min(best, LEVELS.length)}</button>` : ''}</div>
+      ${net.role !== 'guest' && !net.connected ? `<div class="row"><button class="btn2" data-act="challenge" style="border-color:#fde047;color:#fde047">Weekly challenge · ${esc(weekly().info.name)}</button></div>` : ''}
       ${net.avail || boardAvail ? `<div class="row">${net.avail ? '<button class="btn2" data-act="duo">Play duos · invite a friend</button>' : ''}${boardAvail ? '<button class="btn2" data-act="board">Leaderboard</button>' : ''}</div>` : ''}
       ${codesList()}
       ${ALLOW_OWN_BEAT ? beatSection() : ''}
     </div>`;
   } else if (state === 'board') {
     html = boardPanel();
+  } else if (state === 'chdone') {
+    html = chPanel();
+  } else if (state === 'chboard') {
+    html = chBoardPanel();
   } else if (state === 'lobby' && net.role === 'host') {
     html = net.connected ? `<div class="panel">
       <h1>DUOS</h1>
@@ -1322,12 +1343,12 @@ function renderOverlay() {
   } else if (state === 'lost') {
     html = `<div class="panel"><h2>DUO ENDED</h2><p>${esc(lostMsg)}</p><div class="row"><button class="btn" data-act="leave">Play solo</button></div></div>`;
   } else if (state === 'intro') {
-    const L = LEVELS[mission], counts = {};
+    const L = lvl(), counts = {};
     L.e.forEach((e, i) => { if (levelAlive[i]) counts[e[0]] = (counts[e[0]] || 0) + 1; });
     const seen = seenTypesBefore(mission);
     const chips = Object.keys(counts).map(k => `<span class="chip"><i style="background:${TYPES[k].color}"></i>${TYPES[k].name} ×${counts[k]}${seen.has(k) ? '' : ' <span class="new">NEW</span>'}</span>`).join('');
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    html = `<div class="banner"><p class="small" style="letter-spacing:.3em">WORLD ${worldOf(mission) + 1} · ${esc(curTheme().name.toUpperCase())}</p><p class="small" style="margin:4px 0 10px;opacity:.8">♪ ${esc(customBeat ? customName : curBeat().beat)}</p><h2>MISSION ${mission + 1}</h2><p>Enemy tanks: ${total}</p><div class="chips">${chips}</div><p class="small">Click or press Enter to begin</p></div>`;
+    html = `<div class="banner"><p class="small" style="letter-spacing:.3em">${challenge ? 'WEEKLY CHALLENGE' : 'WORLD ' + (worldOf(mission) + 1)} · ${esc(curTheme().name.toUpperCase())}</p><p class="small" style="margin:4px 0 10px;opacity:.8">♪ ${esc(customBeat ? customName : curBeat().beat)}</p><h2>${challenge ? esc(challenge.info.name.toUpperCase()) : 'MISSION ' + (mission + 1)}</h2>${isDark() ? '<p style="color:#fde047;letter-spacing:.2em;font-weight:700">LIGHTS OUT</p>' : ''}${challenge ? `<p class="small" style="color:#fde047">${esc(challenge.info.desc)}</p>` : ''}${mechanic() ? `<p class="small" style="color:#bef264">${MECH_TIP[mechanic()]}</p>` : ''}<p>Enemy tanks: ${total}${!challenge && starStore().s[mission] ? ` · Best ${starStr(starStore().s[mission])}` : ''}</p><div class="chips">${chips}</div><p class="small">Click or press Enter to begin</p></div>`;
   } else if (state === 'paused') {
     html = `<div class="panel"><h2>PAUSED</h2>
       <div class="row"><button class="btn" data-act="resume">Resume</button></div>
@@ -1336,7 +1357,7 @@ function renderOverlay() {
       ${ALLOW_OWN_BEAT ? beatSection() : ''}
     </div>`;
   } else if (state === 'cleared') {
-    html = `<div class="banner"><h2>MISSION CLEARED</h2></div>`;
+    html = challenge ? `<div class="banner"><h2>CHALLENGE CLEARED</h2><p>${fmtTime(missionTime)}</p></div>` : `<div class="banner"><h2>MISSION CLEARED</h2>${starsBanner()}</div>`;
   } else if (state === 'dead') {
     html = `<div class="banner"><h2>${net.connected ? 'BOTH TANKS DOWN' : 'TANK DESTROYED'}</h2><p>${lives - 1 > 0 ? `${lives - 1} ${lives - 1 === 1 ? 'life' : 'lives'} left` : 'No lives left'}</p></div>`;
   } else if (state === 'over' || state === 'win') {
@@ -1382,7 +1403,7 @@ overlay.addEventListener('submit', e => {
     if (msgEl) msgEl.textContent = 'Saving…';
     fetch(asset(LB.name), { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name }) })
       .then(r => r.json().then(j => [r.ok, j]))
-      .then(([ok, j]) => { if (!ok) { if (msgEl) msgEl.textContent = j.error || "Couldn't save that name."; return; } postState = 'idle'; submitScore(); })
+      .then(([ok, j]) => { if (!ok) { if (msgEl) msgEl.textContent = j.error || "Couldn't save that name."; return; } if (challenge && state === 'chdone') { chPost = 'idle'; submitChallenge(); } else { postState = 'idle'; submitScore(); } })
       .catch(() => { if (msgEl) msgEl.textContent = "Couldn't save that name."; });
     return;
   }
@@ -1436,7 +1457,12 @@ overlay.addEventListener('click', e => {
   if (act === 'start') startGame();
   if (act === 'continue') startGame(best - 1);
   if (act === 'restart') startAttempt();
-  if (act === 'quit') setState(net.connected ? 'lobby' : 'title');
+  if (act === 'quit') { if (challenge) { challenge = null; setState('title'); return; } setState(net.connected ? 'lobby' : 'title'); }
+  if (act === 'challenge') { challenge = null; chResult = null; chPost = 'idle'; challenge = weekly(); mission = challenge.theme * 5 + 2; setState('chdone'); return; }
+  if (act === 'chgo') { startChallenge(); return; }
+  if (act === 'chquit') { challenge = null; chResult = null; setState('title'); updateHud(); return; }
+  if (act === 'chboard') { loadChBoard().then(() => setState('chboard')); return; }
+  if (act === 'chback') { setState('chdone'); return; }
   if (act === 'loadbeat') beatFile.click();
   if (act === 'nextworld') newMission();
   if (act === 'copy') {
@@ -1448,7 +1474,7 @@ overlay.addEventListener('click', e => {
 });
 
 function updateHud() {
-  hud.mission.textContent = `${mission + 1}/${LEVELS.length}`;
+  hud.mission.textContent = challenge ? 'WEEKLY' : `${mission + 1}/${LEVELS.length}`;
   hud.lives.textContent = '♥'.repeat(Math.max(0, lives));
   hud.enemies.textContent = tanks.filter(t => t.alive && !t.isPlayer).length;
   hud.score.textContent = score;
@@ -1460,7 +1486,10 @@ function saveBest(m) {
 
 // ---------- Update ----------
 function moveTank(t, dt) {
-  if (!t.remote) { t.x += t.vx * dt; t.y += t.vy * dt; }
+  if (!t.remote) {
+    t.x += t.vx * dt; t.y += t.vy * dt;
+    for (const c of currents) if (t.y >= c.y0 * TILE && t.y < c.y1 * TILE) t.x += c.dir * 58 * dt;
+  }
   // circle vs tile collision
   const tr = rad(t);
   for (let iter = 0; iter < 2; iter++) {
@@ -1496,9 +1525,10 @@ function updatePlayer(t, dt) {
     if (keys['w'] || keys['arrowup']) iy -= 1;
   }
   if (state === 'play' && touch.move.active) { ix += touch.move.x; iy += touch.move.y; }
-  const l = Math.hypot(ix, iy), sp = l > 0.15 ? Math.min(1, l) / l * PLAYER_SPEED : 0;
+  const top = PLAYER_SPEED * (pu(t, 'speed') ? 1.45 : 1) * (speedMul() > 1 ? 1.2 : 1);
+  const l = Math.hypot(ix, iy), sp = l > 0.15 ? Math.min(1, l) / l * top : 0;
   const tvx = ix * sp, tvy = iy * sp;
-  const k = Math.min(1, dt * 14);
+  const k = Math.min(1, dt * (mechanic() === 'ice' ? 2.4 : 14));
   t.vx += (tvx - t.vx) * k; t.vy += (tvy - t.vy) * k;
   if (touch.on) { if (touch.aim.active) t.turretAng = touch.aim.ang; }
   else t.turretAng = Math.atan2(mouse.y - t.y, mouse.x - t.x);
@@ -1512,7 +1542,7 @@ function think(e) {
   if (!e.tgt || state !== 'play') return;
   for (const p of alivePlayers().sort((a, b) => dist2(e, a) - dist2(e, b))) {
     let tx = p.x, ty = p.y;
-    if (c.lead) { const tt = Math.sqrt(dist2(e, p)) / c.shell; tx += p.vx * tt * 0.9; ty += p.vy * tt * 0.9; }
+    if (c.lead || smartTier() >= 3) { const tt = Math.sqrt(dist2(e, p)) / c.shell; tx += p.vx * tt * 0.9; ty += p.vy * tt * 0.9; }
     const a0 = Math.atan2(ty - e.y, tx - e.x);
     const h = traceShot(e.x, e.y, a0, c.bounces, e);
     if (h && h.tank.isPlayer) { e.solution = a0; break; }
@@ -1569,9 +1599,15 @@ function updateEnemy(e, dt) {
       if (cd < 36) {
         let nx, ny;
         if (cd < 0.01) { const l = Math.sqrt(vv); nx = -s.vy / l; ny = s.vx / l; } else { nx = cx / cd; ny = cy / cd; }
-        const w = c.dodge * 4 * (1.3 - cd / 36);
+        const w = c.dodge * 4 * (1.3 - cd / 36) * (1 + smartTier() * 0.25);
         dx += nx * w; dy += ny * w;
       }
+    }
+    // smarter enemies in later worlds: circle around you, and rush in while you're out of shells
+    const tier = smartTier();
+    if (tier && tp.alive) {
+      if (dP < c.keep * 1.8) { const fa = Math.atan2(tp.y - e.y, tp.x - e.x) + (e.seed > 5 ? 1 : -1) * Math.PI / 2; dx += Math.cos(fa) * 0.35 * Math.min(2, tier); dy += Math.sin(fa) * 0.35 * Math.min(2, tier); }
+      if (tp.isPlayer && countShells(tp) >= maxShells(tp) - 1 && dP > 80) { const v = flowDir(e, false); if (v) { dx += v[0] * 1.4; dy += v[1] * 1.4; } }
     }
     // avoid mines
     for (const m of mines) {
@@ -1581,8 +1617,9 @@ function updateEnemy(e, dt) {
     }
   }
   const l = Math.hypot(dx, dy);
-  const tvx = l > 0.15 ? dx / l * c.speed : 0, tvy = l > 0.15 ? dy / l * c.speed : 0;
-  const k = Math.min(1, dt * 6);
+  const esp = c.speed * speedMul() * (1 + smartTier() * 0.04);
+  const tvx = l > 0.15 ? dx / l * esp : 0, tvy = l > 0.15 ? dy / l * esp : 0;
+  const k = Math.min(1, dt * (mechanic() === 'ice' ? 2 : 6));
   e.vx += (tvx - e.vx) * k; e.vy += (tvy - e.vy) * k;
 }
 
@@ -1605,6 +1642,7 @@ function updateShells(dt) {
         if (!t.alive || (t === s.owner && s.age < 0.15)) continue;
         if ((t.x - s.x) ** 2 + (t.y - s.y) ** 2 < (rad(t) + 3) ** 2) {
           if (t.isPlayer && state === 'cleared') { s.alive = false; puff(s.x, s.y); break; }
+          if (s.bank && !s.bounced && !t.isPlayer) { s.alive = false; puff(s.x, s.y, true); break; }
           s.alive = false; hitTank(t, 1); break;
         }
       }
@@ -1632,7 +1670,7 @@ function updateShells(dt) {
   shells = shells.filter(s => s.alive);
 }
 function bounceShell(s) {
-  s.b--;
+  s.b--; s.bounced = true;
   if (s.b < 0) { s.alive = false; puff(s.x, s.y, true); }
   else { fxBounce(s.x, s.y); emit({ e: 'b', x: Math.round(s.x), y: Math.round(s.y) }); }
 }
@@ -1682,7 +1720,7 @@ function update(dt) {
   net.tick(dt);
   if (net.role === 'guest') { updateGuest(dt); return; }
 
-  if (['title', 'over', 'win', 'paused', 'world', 'lobby', 'join', 'joining', 'lost', 'board'].includes(state)) return;
+  if (['title', 'over', 'win', 'paused', 'world', 'lobby', 'join', 'joining', 'lost', 'board', 'chdone', 'chboard'].includes(state)) return;
 
   if (state === 'intro') { if (stateT > 2.6) setState('play'); return; }
 
@@ -1699,12 +1737,19 @@ function update(dt) {
   for (const t of tanks) if (t.alive) moveTank(t, 0); // re-resolve walls after pushes
   updateShells(dt);
   updateMines(dt);
+  updateMechanics(dt);
+  if (state === 'play') missionTime += dt;
 
   if (state === 'play') {
     const left = tanks.filter(t => t.alive && !t.isPlayer).length;
-    if (left === 0 && alivePlayers().length) { setState('cleared'); sfx.clear(); emit({ e: 'clr' }); track('tanks_mission_cleared', { score }); }
+    if (left === 0 && alivePlayers().length) { if (!challenge) rateMission(); setState('cleared'); sfx.clear(); emit({ e: 'clr' }); track('tanks_mission_cleared', { score }); }
   }
-  if (state === 'cleared' && stateT > 2.2) {
+  if (challenge) {
+    if (state === 'cleared' && stateT > 1.6) finishChallenge(true);
+    else if (state === 'dead' && stateT > 1.8) finishChallenge(false);
+    return;
+  }
+  if (state === 'cleared' && stateT > 3.2) {
     mission++;
     saveBest(mission + 1 > LEVELS.length ? LEVELS.length : mission + 1);
     if (mission >= LEVELS.length) { mission = LEVELS.length - 1; saveBest(LEVELS.length); unlockWorld(WORLDS.length - 1); setState('win'); track('tanks_win', { score, kills }); updateHud(); return; }
@@ -1715,6 +1760,318 @@ function update(dt) {
     saveBest(mission + 1);
     if (lives <= 0) { lives = 0; updateHud(); setState('over'); track('tanks_game_over', { score, kills }); }
     else startAttempt();
+  }
+}
+
+// ================= EXTRAS: power-ups, world mechanics, lights out, stars, weekly challenge, smarter enemies =================
+const PU = {
+  speed:  { name: 'Speed boost',   color: '#38bdf8', icon: '»', dur: 8, bit: 1 },
+  shield: { name: 'Shield',        color: '#a78bfa', icon: '◆', dur: 15, bit: 2 },
+  triple: { name: 'Triple shot',   color: '#f472b6', icon: '⁂', dur: 10, bit: 4 },
+  bounce: { name: 'Extra bounces', color: '#bef264', icon: '↯', dur: 10, bit: 8 },
+};
+const TWISTS = [
+  { id: 'bank',    name: 'Bank shots only', desc: 'Your shells only count after they bounce off a wall. You get an extra bounce.' },
+  { id: 'oneshot', name: 'One shell',       desc: 'Only one of your shells can be out at a time. Make it count.' },
+  { id: 'double',  name: 'Double trouble',  desc: 'Ten enemy tanks. One life.' },
+  { id: 'dark',    name: 'Lights out',      desc: 'The lights stay off. Shots and explosions light up the map.' },
+  { id: 'fast',    name: 'Overdrive',       desc: 'Everything moves faster, including you.' },
+];
+let pickups = [], puTimer = 0, hazards = [], lavaT = 0, flick = null, currents = [];
+let missionTime = 0, missionShots = 0, missionDeaths = 0, lastStars = null;
+let challenge = null, chResult = null, chBoard = null, chAvail = false, chPost = 'idle', chRank = null, WEEKLY = null;
+const pu = (t, k) => !!(t && t.pu && t.pu[k] > 0);
+const lvl = () => (challenge ? challenge.level : LEVELS[mission]);
+const wid = () => (challenge ? challenge.theme : Math.min(THEMES.length - 1, worldOf(mission)));
+const mechanic = () => ({ 6: 'ice', 3: 'current', 4: 'flicker', 8: 'lava' })[wid()] || null;
+const isDark = () => (challenge ? challenge.twist === 'dark' : mission % 5 === 3 && mission >= 13);
+const smartTier = () => (challenge ? 4 : Math.max(0, worldOf(mission) - 4));
+const speedMul = () => (challenge && challenge.twist === 'fast' ? 1.3 : 1);
+const maxShells = t => (challenge && challenge.twist === 'oneshot' ? 1 : PLAYER_CFG.max + (pu(t, 'triple') ? 6 : 0));
+const fmtTime = s => { const m = Math.floor(s / 60), r = s - m * 60; return m + ':' + (r < 10 ? '0' : '') + r.toFixed(1); };
+const MECH_TIP = { ice: 'Ice floor: tanks slide. Brake early.', current: 'Currents push tanks along the glowing lanes.', flicker: 'Neon walls switch off and on. Watch them blink.', lava: 'Lava erupts. Stay clear of glowing pits.' };
+
+function makeCurrents() {
+  if (mechanic() !== 'current') return [];
+  const r = seededRng('cur#' + mapWeek.key + '#' + mission + (challenge ? '#ch' : ''));
+  const ys = r.shuffle([2, 5, 9, 12]).slice(0, 2).sort((a, b) => a - b), d = r() < 0.5 ? 1 : -1;
+  return [{ y0: ys[0], y1: ys[0] + 2, dir: d }, { y0: ys[1], y1: ys[1] + 2, dir: -d }];
+}
+function setupMechanics() {
+  pickups = []; hazards = []; puTimer = rand(6, 9); lavaT = rand(3, 5);
+  currents = makeCurrents();
+  flick = null;
+  if (mechanic() === 'flicker') {
+    const r = seededRng('flk#' + mapWeek.key + '#' + mission + (challenge ? '#ch' : ''));
+    const walls = [];
+    for (let i = 0; i < grid.length; i++) if (grid[i] === 1) walls.push(i);
+    const tiles = r.shuffle(walls).slice(0, Math.min(26, Math.ceil(walls.length * 0.35)));
+    if (tiles.length) flick = { tiles, on: true, t: 0, warn: false };
+  }
+}
+function spawnPickup() {
+  for (let tries = 0; tries < 80; tries++) {
+    const cx = 2 + Math.floor(Math.random() * (COLS - 4)), cy = 1 + Math.floor(Math.random() * (ROWS - 2));
+    if (tileAt(cx, cy) || tileAt(cx + 1, cy) || tileAt(cx - 1, cy) || tileAt(cx, cy + 1) || tileAt(cx, cy - 1)) continue;
+    const x = cx * TILE + TILE / 2, y = cy * TILE + TILE / 2;
+    if (tanks.some(t => t.alive && (t.x - x) ** 2 + (t.y - y) ** 2 < 120 * 120)) continue;
+    const keys = Object.keys(PU);
+    pickups.push({ id: nextId++, kind: keys[Math.floor(Math.random() * keys.length)], x, y, t: 0 });
+    return;
+  }
+}
+function grant(t, k) {
+  t.pu = t.pu || {};
+  t.pu[k] = PU[k].dur;
+  fxPower(t.x, t.y, k);
+  emit({ e: 'pu', k, id: t.id, x: Math.round(t.x), y: Math.round(t.y) });
+  if (t === me) toast(PU[k].name + '!');
+  track('tanks_powerup', { kind: k });
+}
+function fxPower(x, y, k) {
+  sfx.power();
+  parts.push({ x, y, vx: 0, vy: 0, life: 0.4, max: 0.4, r: 34, kind: 'pring', c: PU[k].color });
+}
+function fxShield(x, y) {
+  sfx.bounce(); shake = Math.max(shake, 4);
+  parts.push({ x, y, vx: 0, vy: 0, life: 0.45, max: 0.45, r: 40, kind: 'pring', c: PU.shield.color });
+}
+function fxErupt(x, y) {
+  for (let i = 0; i < 30; i++) { const a = Math.random() * TAU, s = rand(40, 200); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 0.9), max: 0.9, r: rand(4, 9), kind: 'fire' }); }
+  parts.push({ x, y, vx: 0, vy: 0, life: 0.4, max: 0.4, r: 64, kind: 'ring' });
+  shake = Math.max(shake, 8); sfx.erupt();
+}
+function updateMechanics(dt) {
+  if (state !== 'play') return;
+  // power-ups
+  puTimer -= dt;
+  if (puTimer <= 0 && pickups.length < (net.connected ? 2 : 1)) { spawnPickup(); puTimer = rand(11, 17); }
+  for (const p of pickups) {
+    p.t += dt;
+    for (const t of alivePlayers()) if ((t.x - p.x) ** 2 + (t.y - p.y) ** 2 < 30 * 30) { grant(t, p.kind); p.dead = true; break; }
+    if (p.t > 14) p.dead = true;
+  }
+  pickups = pickups.filter(p => !p.dead);
+  for (const t of tanks) if (t.isPlayer && t.pu) for (const k in t.pu) t.pu[k] = Math.max(0, t.pu[k] - dt);
+  // lava eruptions
+  if (mechanic() === 'lava') {
+    lavaT -= dt;
+    if (lavaT <= 0) {
+      lavaT = rand(2.8, 4.8);
+      const pits = [];
+      for (let i = 0; i < grid.length; i++) if (grid[i] === 3) pits.push(i);
+      if (pits.length) {
+        const i = pits[Math.floor(Math.random() * pits.length)], x = (i % COLS) * TILE + TILE / 2, y = Math.floor(i / COLS) * TILE + TILE / 2;
+        hazards.push({ x, y, t: 0, life: 1.3, host: true });
+        emit({ e: 'lw', x, y });
+      }
+    }
+  }
+  for (const h of hazards) {
+    h.t += dt;
+    if (h.host && h.t >= h.life && !h.done) {
+      h.done = true;
+      fxErupt(h.x, h.y); emit({ e: 'le', x: h.x, y: h.y });
+      for (const t of tanks) if (t.alive && (t.x - h.x) ** 2 + (t.y - h.y) ** 2 < (62 + rad(t)) ** 2) hitTank(t, 1);
+    }
+  }
+  hazards = hazards.filter(h => h.t < h.life + 0.05);
+  // flickering neon walls
+  if (flick) {
+    flick.t += dt;
+    const per = flick.on ? 4.5 : 3;
+    flick.warn = flick.t > per - 0.9;
+    if (flick.t >= per) {
+      if (flick.on) { for (const i of flick.tiles) if (grid[i] === 1) grid[i] = 0; }
+      else for (const i of flick.tiles) {
+        const cx = i % COLS, cy = Math.floor(i / COLS), x = cx * TILE + TILE / 2, y = cy * TILE + TILE / 2;
+        if (grid[i] !== 0) continue;
+        if (tanks.some(t => t.alive && Math.abs(t.x - x) < TILE / 2 + rad(t) && Math.abs(t.y - y) < TILE / 2 + rad(t))) continue;
+        grid[i] = 1;
+      }
+      flick.on = !flick.on; flick.t = 0; flick.warn = false;
+      gridV++; drawBg(); flowTile = -1;
+    }
+  }
+}
+
+// ---- stars: no deaths, under par time, few shots. Best per mission, per weekly map set.
+function starStore() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem('jt_stars') || 'null'); } catch (e) {}
+  if (!s || s.week !== mapWeek.key) s = { week: mapWeek.key, s: {} };
+  return s;
+}
+function saveStars(m, n) {
+  const s = starStore();
+  if ((s.s[m] || 0) < n) s.s[m] = n;
+  try { localStorage.setItem('jt_stars', JSON.stringify(s)); } catch (e) {}
+}
+const totalStars = () => Object.values(starStore().s).reduce((a, b) => a + b, 0);
+const starStr = n => '★'.repeat(n) + '☆'.repeat(3 - n);
+function rateMission() {
+  const nE = lvl().e.length, par = Math.round(14 + nE * 7), parShots = nE * 2 + 3;
+  const s = [missionDeaths === 0, missionTime <= par, missionShots <= parShots];
+  lastStars = { s, time: missionTime, par, shots: missionShots, parShots };
+  saveStars(mission, s.filter(Boolean).length);
+  emit({ e: 'st', s: s.map(Number), tm: +missionTime.toFixed(1), pr: par, sh: missionShots, ps: parShots });
+}
+function starsBanner() {
+  if (!lastStars) return '';
+  const [a, b, c] = lastStars.s, n = lastStars.s.filter(Boolean).length;
+  const item = (ok, label) => `<span style="opacity:${ok ? 1 : 0.4};margin:0 7px">${ok ? '★' : '☆'} ${label}</span>`;
+  return `<div style="font-size:34px;letter-spacing:6px;color:#fde047;margin:2px 0 4px">${starStr(n)}</div>
+    <p class="small">${item(a, 'No deaths')}${item(b, 'Under ' + fmtTime(lastStars.par) + ' (' + fmtTime(lastStars.time) + ')')}${item(c, lastStars.parShots + ' shots or less (' + lastStars.shots + ')')}</p>`;
+}
+
+// ---- weekly challenge: one twist mission each Monday, fastest clear wins
+function weeklyChallenge() {
+  const r = seededRng(mapWeek.key + '#challenge');
+  const weekNo = Math.round((Date.parse(mapWeek.key + 'T00:00:00Z') - Date.parse('2026-11-09T00:00:00Z')) / (7 * 864e5));
+  const info = TWISTS[((weekNo % TWISTS.length) + TWISTS.length) % TWISTS.length];
+  const theme = r.int(0, THEMES.length - 1), pool = ['g', 'y', 'r', 'p', 'w', 'e', 't', 'k'];
+  const roster = Array.from({ length: info.id === 'double' ? 10 : 6 }, () => r.pick(pool));
+  const arch = r.pick(ARCHETYPES.filter(a => a !== 'corkwall'));
+  let level = null;
+  for (let tries = 0; !level && tries < 900; tries++) level = genMap(theme * 5 + 2, roster, seededRng(mapWeek.key + '#ch#' + tries), tries < 600 ? arch : 'pillars');
+  return { twist: info.id, info, theme, level: level || CLASSIC[20] };
+}
+const weekly = () => WEEKLY || (WEEKLY = weeklyChallenge());
+function chBest() { try { const j = JSON.parse(localStorage.getItem('jt_chbest') || 'null'); return j && j.week === mapWeek.key ? j.t : null; } catch (e) { return null; } }
+function startChallenge() {
+  if (net.connected || net.role === 'guest') return;
+  challenge = weekly();
+  mission = challenge.theme * 5 + 2; lives = 1; score = 0; kills = 0;
+  runStart = mission; chResult = null; chPost = 'idle'; chRank = null;
+  track('tanks_challenge_start', { twist: challenge.twist });
+  music.resetBeat();
+  newMission();
+}
+function finishChallenge(won) {
+  chResult = { won, time: missionTime };
+  if (won) {
+    const b = chBest();
+    if (b == null || missionTime < b) { try { localStorage.setItem('jt_chbest', JSON.stringify({ week: mapWeek.key, t: missionTime })); } catch (e) {} }
+    track('tanks_challenge_clear', { twist: challenge.twist, time: +missionTime.toFixed(1) });
+  }
+  setState('chdone');
+  if (won) submitChallenge();
+}
+const LBC = { board: '/api/tanks/challenge' };
+function loadChBoard() {
+  return fetch(asset(LBC.board), { headers: authHeaders() })
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => { if (j && Array.isArray(j.top)) { chBoard = j; chAvail = true; } return chBoard; })
+    .catch(() => null);
+}
+function submitChallenge() {
+  if (!chAvail || !chResult || !chResult.won) return;
+  if (!storeSession()) { chPost = 'signin'; renderOverlay(); return; }
+  chPost = 'posting'; renderOverlay();
+  fetch(asset(LBC.board), { method: 'POST', headers: authHeaders(), body: JSON.stringify({ timeMs: Math.round(chResult.time * 1000), twist: challenge ? challenge.twist : '' }) })
+    .then(r => r.json().then(j => [r.status, j]))
+    .then(([status, j]) => {
+      if (status === 401) { chPost = 'signin'; renderOverlay(); return; }
+      if (status !== 200) { chPost = 'error'; renderOverlay(); return; }
+      if (j.needsName) { chPost = 'needsName'; renderOverlay(); return; }
+      return loadChBoard().then(b => { chRank = b && b.me ? b.me.rank : null; chPost = 'posted'; renderOverlay(); });
+    })
+    .catch(() => { chPost = 'error'; renderOverlay(); });
+}
+function chPanel() {
+  const w = challenge || weekly(), r = chResult, b = chBest();
+  const link = `<a href="${esc(BRAND.store.replace(/\/$/, ''))}/account" target="_blank" rel="noopener">${esc(BRAND.store.replace(/^https?:\/\//, ''))}/account</a>`;
+  const post = chAvail ? ({
+    posting: '<p class="small"><span class="pulse"></span>Posting your time…</p>',
+    posted: `<p>${chRank ? `You're <b>#${chRank}</b> on this week's challenge.` : 'Your time is on the board.'}</p>`,
+    signin: `<p class="small">Sign in at ${link} to get on the challenge board.</p>`,
+    error: '<p class="small">Couldn\'t post your time right now.</p>',
+    needsName: `<div class="card" style="margin-top:10px">Pick a player name for the leaderboard
+      <form class="signup" data-form="pname"><input name="pname" maxlength="16" required placeholder="3 to 16 letters or numbers" autocomplete="off"><button class="btn2" type="submit" style="margin:0">Save</button></form>
+      <div class="small" id="pnameMsg"></div></div>`
+  }[chPost] || '') : '';
+  return `<div class="panel">
+    <p class="small" style="letter-spacing:.3em">WEEKLY CHALLENGE · ${esc(THEMES[w.theme].name.toUpperCase())}</p>
+    <h2>${esc(w.info.name.toUpperCase())}</h2>
+    ${r ? (r.won ? `<div class="stats">Cleared in <b>${fmtTime(r.time)}</b></div>` : `<div class="stats">Your tank went down at ${fmtTime(r.time)}.</div>`) : `<p>${esc(w.info.desc)}</p>`}
+    ${b != null ? `<p class="small">Your best this week: ${fmtTime(b)}</p>` : ''}
+    ${post}
+    ${beatCard(r ? 'The beat you played to' : 'Challenge soundtrack')}
+    <div class="row"><button class="btn" data-act="chgo">${r ? 'Try again' : 'Start challenge'}</button></div>
+    <div class="row">${chAvail ? '<button class="btn2" data-act="chboard">Challenge leaderboard</button>' : ''}<button class="btn2" data-act="chquit">Back to title</button></div>
+    <p class="small">One life. Fastest clear this week wins. New challenge every Monday.</p>
+  </div>`;
+}
+function chBoardPanel() {
+  const rows = chBoard && chBoard.top && chBoard.top.length
+    ? chBoard.top.slice(0, 10).map(r => `<tr${r.me ? ' style="color:#bef264"' : ''}><td>#${r.rank}</td><td style="text-align:left">${esc(r.name)}</td><td>${fmtTime(r.timeMs / 1000)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="small" style="padding:14px">No times yet this week. Be the first.</td></tr>';
+  const me = chBoard && chBoard.me;
+  return `<div class="panel" style="min-width:min(420px,90vw)">
+    <h2>CHALLENGE · ${esc(weekly().info.name.toUpperCase())}</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:6px"><thead><tr class="small"><th>#</th><th style="text-align:left">Player</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>
+    ${me && me.rank && me.rank > 10 ? `<p class="small">You're #${me.rank} (${esc(me.name)}).</p>` : ''}
+    <div class="row"><button class="btn" data-act="chback">Back</button></div>
+  </div>`;
+}
+
+// ---- lights out
+const dark = document.createElement('canvas');
+function drawDark() {
+  if (dark.width !== canvas.width || dark.height !== canvas.height) { dark.width = canvas.width; dark.height = canvas.height; }
+  const d = dark.getContext('2d');
+  d.setTransform(1, 0, 0, 1, 0, 0); d.globalCompositeOperation = 'source-over';
+  d.clearRect(0, 0, dark.width, dark.height);
+  d.fillStyle = 'rgba(2,2,5,.955)'; d.fillRect(0, 0, dark.width, dark.height);
+  d.setTransform(scale, 0, 0, scale, 0, 0); d.globalCompositeOperation = 'destination-out';
+  const hole = (x, y, r, a = 1) => { const g = d.createRadialGradient(x, y, r * 0.2, x, y, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); d.fillStyle = g; d.beginPath(); d.arc(x, y, r, 0, TAU); d.fill(); };
+  for (const t of tanks) if (t.alive && t.isPlayer) { hole(t.x, t.y, 160); hole(t.x + Math.cos(t.turretAng) * 130, t.y + Math.sin(t.turretAng) * 130, 85, 0.75); }
+  for (const t of tanks) if (t.alive && !t.isPlayer && t.reveal > 0) hole(t.x, t.y, 70, Math.min(1, t.reveal * 3));
+  for (const s of shells) hole(s.x, s.y, 46, 0.85);
+  for (const p of parts) if (p.kind === 'fire' || p.kind === 'ring') hole(p.x, p.y, p.kind === 'ring' ? p.r * 1.6 : 30, 0.7 * (p.life / p.max));
+  for (const p of pickups) hole(p.x, p.y, 34, 0.8);
+  for (const h of hazards) hole(h.x, h.y, 70, 0.8);
+  for (const m of mines) hole(m.x, m.y, 22, 0.5);
+  if (mechanic() === 'lava') for (let i = 0; i < grid.length; i++) if (grid[i] === 3) hole((i % COLS) * TILE + 20, Math.floor(i / COLS) * TILE + 20, 44, 0.6);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(dark, 0, 0); ctx.restore();
+}
+function drawExtras() {
+  // flickering walls
+  if (flick) for (const i of flick.tiles) {
+    const x = (i % COLS) * TILE, y = Math.floor(i / COLS) * TILE, on = grid[i] === 1;
+    if (on && flick.warn && Math.floor(time * 10) % 2) { ctx.fillStyle = 'rgba(236,72,153,.35)'; ctx.fillRect(x, y, TILE, TILE); }
+    if (!on) { ctx.save(); ctx.setLineDash([4, 5]); ctx.strokeStyle = `rgba(236,72,153,${flick.warn && Math.floor(time * 10) % 2 ? 0.9 : 0.3})`; ctx.lineWidth = 1.5; ctx.strokeRect(x + 3, y + 3, TILE - 6, TILE - 6); ctx.restore(); }
+  }
+  // lava warnings
+  for (const h of hazards) {
+    const k = Math.min(1, h.t / h.life);
+    ctx.strokeStyle = `rgba(251,146,60,${0.4 + 0.5 * Math.abs(Math.sin(time * 18))})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(h.x, h.y, 20 + 46 * k, 0, TAU); ctx.stroke();
+    ctx.fillStyle = `rgba(253,224,71,${0.25 * k})`; ctx.beginPath(); ctx.arc(h.x, h.y, 62, 0, TAU); ctx.fill();
+  }
+  // pickups
+  for (const p of pickups) {
+    if (p.t > 11 && Math.floor(p.t * 8) % 2) continue;
+    const info = PU[p.kind], bob = Math.sin(time * 4 + p.id) * 2;
+    ctx.save(); ctx.translate(p.x, p.y + bob);
+    ctx.shadowColor = info.color; ctx.shadowBlur = 16;
+    ctx.fillStyle = 'rgba(10,10,14,.9)'; ctx.beginPath(); ctx.arc(0, 0, 13, 0, TAU); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = info.color; ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = info.color; ctx.font = '800 14px ui-sans-serif,system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(info.icon, 0, 1);
+    ctx.restore();
+  }
+}
+function drawAuras() {
+  for (const t of tanks) {
+    if (!t.alive || !t.isPlayer || !t.pu) continue;
+    let i = 0;
+    for (const k of ['shield', 'speed', 'triple', 'bounce']) {
+      if (!(t.pu[k] > 0)) continue;
+      const c = PU[k].color;
+      if (k === 'shield') { ctx.strokeStyle = c; ctx.globalAlpha = 0.5 + 0.2 * Math.sin(time * 6); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(t.x, t.y, rad(t) + 9, 0, TAU); ctx.stroke(); ctx.globalAlpha = 0.12; ctx.fillStyle = c; ctx.fill(); ctx.globalAlpha = 1; }
+      else { const a = time * 3 + i * 2.1; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(t.x + Math.cos(a) * (rad(t) + 8), t.y + Math.sin(a) * (rad(t) + 8), 3.5, 0, TAU); ctx.fill(); i++; }
+    }
   }
 }
 
@@ -1732,7 +2089,7 @@ const THEMES = [
   { name: 'Magma',         floor: '#120b09', slab: [255,120,60], line: 'rgba(255,120,60,.03)', wall: ['#3a2a24', '#5a4339', '#45332b'], cork: ['#4a2f22', '#62402e'], pit: 'lava', edge: 'rgba(251,146,60,.6)', deco: 'cracks', wallStyle: 'basalt' },
   { name: 'Gold Room',     floor: '#0b0b0d', slab: [255,230,160], line: 'rgba(212,175,55,.06)', wall: ['#1c1a14', '#34302a', '#24211b'], cork: ['#4a3f2a', '#615338'], pit: 'void', edge: 'rgba(212,175,55,.5)', deco: 'marble', wallStyle: 'gold' },
 ];
-const curTheme = () => THEMES[Math.min(THEMES.length - 1, worldOf(mission))];
+const curTheme = () => THEMES[wid()];
 
 function drawBg() {
   bg.width = canvas.width; bg.height = canvas.height;
@@ -1777,6 +2134,13 @@ function drawBg() {
   b.strokeStyle = th.line; b.lineWidth = 1;
   for (let x = 0; x <= W; x += TILE) { b.beginPath(); b.moveTo(x + .5, 0); b.lineTo(x + .5, H); b.stroke(); }
   for (let y = 0; y <= H; y += TILE) { b.beginPath(); b.moveTo(0, y + .5); b.lineTo(W, y + .5); b.stroke(); }
+  // ---- currents
+  currents = makeCurrents();
+  for (const c of currents) {
+    b.fillStyle = 'rgba(120,220,255,.07)'; b.fillRect(0, c.y0 * TILE, W, (c.y1 - c.y0) * TILE);
+    b.strokeStyle = 'rgba(160,230,255,.22)'; b.lineWidth = 2;
+    for (let x = 20; x < W; x += 60) for (let r = c.y0; r < c.y1; r++) { const y = r * TILE + 20, d = c.dir * 7; b.beginPath(); b.moveTo(x - d, y - 7); b.lineTo(x + d, y); b.lineTo(x - d, y + 7); b.stroke(); }
+  }
   // ---- pits
   for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
     if (grid[cy * COLS + cx] !== 3) continue;
@@ -1961,8 +2325,10 @@ function render() {
     ctx.fillStyle = lit ? (left < 2.5 ? '#ff3b2f' : '#ff8a3d') : '#6d2a10';
     ctx.beginPath(); ctx.arc(m.x, m.y, 4, 0, TAU); ctx.fill();
   }
+  drawExtras();
   // tanks
   for (const t of tanks) if (t.alive) drawTank(t);
+  drawAuras();
   if (net.connected) {
     ctx.save(); ctx.font = '700 10px ui-sans-serif,system-ui,sans-serif'; ctx.textAlign = 'center';
     for (const t of tanks) if (t.isPlayer && t.alive) { ctx.fillStyle = t.type === 'player2' ? '#fde047' : '#34d399'; ctx.fillText(t === me ? 'YOU' : 'DUO', t.x, t.y - 25); }
@@ -1992,8 +2358,10 @@ function render() {
     else if (p.kind === 'trail') { ctx.fillStyle = `rgba(255,255,255,${k * 0.4})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); }
     else if (p.kind === 'spark') { ctx.fillStyle = `rgba(255,230,140,${k})`; ctx.fillRect(p.x - 1, p.y - 1, 2.5, 2.5); }
     else if (p.kind === 'chip') { ctx.fillStyle = `rgba(150,142,132,${k})`; ctx.fillRect(p.x - 2, p.y - 2, 4, 4); }
+    else if (p.kind === 'pring') { ctx.strokeStyle = p.c; ctx.globalAlpha = k; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.2 - k * 0.7), 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
     else if (p.kind === 'ring') { ctx.strokeStyle = `rgba(255,230,180,${k * 0.8})`; ctx.lineWidth = 4 * k + 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.15 - k * 0.8), 0, TAU); ctx.stroke(); }
   }
+  if (isDark() && (state === 'play' || state === 'cleared' || state === 'dead' || state === 'paused')) drawDark();
   // touch aim line
   if (touch.on && touch.aim.active && me && me.alive && state === 'play') {
     const yel = me.type === 'player2';
@@ -2207,12 +2575,15 @@ function makeSnap(full) {
   const snap = {
     t: 's', st: state, m: mission, rs: runStart, bt: missionBeat ? missionBeat.id : null, l: lives, sc: score, k: kills, at: attempt, g: gridV,
     la: levelAlive.map(v => (v ? 1 : 0)),
-    tk: tanks.map(t => [t.id, t.type, Math.round(t.x), Math.round(t.y), Math.round(t.bodyAng * 100), Math.round(t.turretAng * 100), t.alive ? 1 : 0, t.reveal > 0.25 ? 1 : 0, t.hp, t.hurt > 0 ? 1 : 0]),
+    tk: tanks.map(t => [t.id, t.type, Math.round(t.x), Math.round(t.y), Math.round(t.bodyAng * 100), Math.round(t.turretAng * 100), t.alive ? 1 : 0, t.reveal > 0.25 ? 1 : 0, t.hp, t.hurt > 0 ? 1 : 0, t.pu ? Object.keys(PU).reduce((m, k) => m | (t.pu[k] > 0 ? PU[k].bit : 0), 0) : 0]),
+    pk: pickups.map(p => [p.id, p.kind, Math.round(p.x), Math.round(p.y), +p.t.toFixed(1)]),
+    fl: flick ? [flick.on ? 1 : 0, flick.warn ? 1 : 0] : 0,
     sh: shells.filter(s => s.alive).map(s => [s.id, Math.round(s.x), Math.round(s.y), Math.round(s.vx), Math.round(s.vy), s.rocket ? 1 : 0, s.owner ? s.owner.id : 0]),
     mn: mines.filter(m => m.alive).map(m => [m.id, Math.round(m.x), Math.round(m.y), Math.round((m.fuse - m.t) * 10), m.owner ? m.owner.id : 0]),
     ev: netEvents.splice(0)
   };
   if (full && grid) snap.grid = Array.from(grid).join('');
+  if (full && flick) snap.ft = flick.tiles;
   return snap;
 }
 function hostOnMsg(m) {
@@ -2222,7 +2593,7 @@ function hostOnMsg(m) {
       p2.x = m.x; p2.y = m.y; p2.bodyAng = m.b; p2.turretAng = m.ta; p2.vx = m.vx; p2.vy = m.vy;
     }
   } else if (m.t === 'fire') {
-    if (p2 && p2.alive && state === 'play' && countShells(p2) < PLAYER_CFG.max) fire(p2, m.a);
+    if (p2 && p2.alive && state === 'play' && countShells(p2) < maxShells(p2)) fire(p2, m.a);
   } else if (m.t === 'mine') {
     if (p2 && p2.alive && state === 'play') layMine(p2);
   } else if (m.t === 'pause') {
@@ -2247,7 +2618,7 @@ function applySnap(m) {
   if (!grid) return; // wait for the first full snapshot
   const byId = new Map(tanks.map(t => [t.id, t]));
   const next = [];
-  for (const [id, type, x, y, b, ta, al, rv, hp, hu] of m.tk) {
+  for (const [id, type, x, y, b, ta, al, rv, hp, hu, pb] of m.tk) {
     let t = byId.get(id);
     if (!t) {
       t = makeTank(type, 0, 0); t.id = id; t.x = x; t.y = y; t.bodyAng = b / 100; t.turretAng = ta / 100;
@@ -2259,6 +2630,7 @@ function applySnap(m) {
     if (rv) t.reveal = 0.35;
     if (hp != null) t.hp = hp;
     if (hu) t.hurt = 0.3;
+    if (pb != null) { t.pu = {}; for (const k in PU) t.pu[k] = pb & PU[k].bit ? 1 : 0; }
     next.push(t);
   }
   tanks = next;
@@ -2275,6 +2647,9 @@ function applySnap(m) {
     q.x = x; q.y = y; q.fuse = 10; q.t = 10 - left / 10; q.owner = tankById.get(o) || null;
     return q;
   });
+  pickups = (m.pk || []).map(([id, kind, x, y, tt]) => ({ id, kind, x, y, t: tt }));
+  if (m.ft) flick = { tiles: m.ft, on: true, warn: false };
+  if (!m.fl) { if (m.fl === 0) flick = null; } else if (flick) { flick.on = !!m.fl[0]; flick.warn = !!m.fl[1]; }
   for (const v of m.ev || []) playEvent(v);
   if (m.st !== state) {
     if (m.st === 'world') unlockWorld(worldOf(mission) - 1);
@@ -2310,6 +2685,8 @@ function updateGuest(dt) {
     }
   }
   for (const q of mines) q.t += dt;
+  for (const h of hazards) h.t += dt;
+  hazards = hazards.filter(h => h.t < h.life + 0.05);
 }
 
 document.addEventListener('click', e => {
@@ -2504,6 +2881,7 @@ try { inviteCode = (new URLSearchParams(location.search).get('duo') || '').toUpp
 setState('title');
 loadCatalog().then(() => { if (state === 'title') renderOverlay(); });
 loadBoard().then(() => { if (state === 'title') renderOverlay(); });
+loadChBoard();
 net.checkAvailable().then(ok => {
   if (ok && inviteCode && state === 'title') setState('join');
   else if (ok && state === 'title') renderOverlay();
@@ -2511,7 +2889,7 @@ net.checkAvailable().then(ok => {
 requestAnimationFrame(frame);
 
 // expose for testing
-window.__rt = { get state() { return state; }, LEVELS, TYPES, step: update, setState, startGame, get tanks() { return tanks; }, get player() { return player; }, get player2() { return player2; }, get me() { return me; }, get grid() { return grid; }, set mission(v) { mission = v; }, get mission() { return mission; }, get lives() { return lives; }, newMission, net, beginPlay, togglePause, shoot, dropMine, mouse, keys, get shells() { return shells; } };
+window.__rt = { get pickups() { return pickups; }, get flick() { return flick; }, get hazards() { return hazards; }, get lastStars() { return lastStars; }, get challenge() { return challenge; }, get missionTime() { return missionTime; }, get currents() { return currents; }, get grid() { return grid; }, grant, spawnPickup, startChallenge, weekly, isDark, mechanic, totalStars, hitTank, fire, get state() { return state; }, LEVELS, TYPES, step: update, setState, startGame, get tanks() { return tanks; }, get player() { return player; }, get player2() { return player2; }, get me() { return me; }, set mission(v) { mission = v; }, get mission() { return mission; }, get lives() { return lives; }, newMission, net, beginPlay, togglePause, shoot, dropMine, mouse, keys, get shells() { return shells; } };
 })();
 </script>
 </body>
