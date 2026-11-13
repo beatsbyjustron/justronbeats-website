@@ -1,3 +1,4 @@
+import { formatKey } from "./musical-key";
 import { Beat, FeaturedProduction } from "@/components/types";
 import { getBeatLeasePrice } from "@/lib/pricing";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -56,7 +57,7 @@ async function mapBeat(row: BeatRow, supabase: NonNullable<ReturnType<typeof get
     leasePrice: getBeatLeasePrice(row.lease_price),
     producedBy: Array.isArray(row.produced_by) ? row.produced_by : parseProducedBy(row.producer_credits),
     bpm: row.bpm,
-    key: row.key,
+    key: formatKey(row.key) || "Unknown",
     tags: row.tags ?? [],
     coverArtUrl: safeCoverArtUrl,
     mp3Url: safeMp3Url,

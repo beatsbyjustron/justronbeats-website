@@ -1,5 +1,6 @@
 "use client";
 
+import { formatKey, uniqueKeys } from "@/lib/musical-key";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -429,8 +430,7 @@ export default function AdminUploadPage() {
   };
 
   const adminBeatKeys = useMemo(() => {
-    const keys = beats.map((beat) => beat.key).filter(Boolean);
-    return Array.from(new Set(keys)).sort((a, b) => a.localeCompare(b));
+    return uniqueKeys(beats.map((beat) => beat.key));
   }, [beats]);
 
   const filteredAdminBeats = useMemo(() => {
@@ -450,7 +450,7 @@ export default function AdminUploadPage() {
         String(beat.bpm).includes(query) ||
         tags.includes(query) ||
         collaborators.includes(query);
-      const matchesKey = adminBeatKey === "all" || beat.key.toLowerCase() === adminBeatKey.toLowerCase();
+      const matchesKey = adminBeatKey === "all" || formatKey(beat.key) === formatKey(adminBeatKey);
       const matchesMin = !hasMin || beat.bpm >= min;
       const matchesMax = !hasMax || beat.bpm <= max;
       return matchesText && matchesKey && matchesMin && matchesMax;
