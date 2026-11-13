@@ -1,3 +1,4 @@
+import { formatKey } from "@/lib/musical-key";
 import { randomUUID } from "crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -127,7 +128,7 @@ export async function PATCH(request: Request) {
     const payload = {
       title,
       producer_credits: String(body.producerCredits ?? "").trim(),
-      key: String(body.key ?? "").trim() || "Unknown",
+      key: formatKey(String(body.key ?? "")) || "Unknown",
       bpm: Number.isFinite(Number(body.bpm)) ? Math.max(0, Number(body.bpm)) : 0,
       tags: Array.isArray(body.tags)
         ? body.tags
@@ -207,7 +208,7 @@ export async function POST(request: Request) {
     const producerCredits = String(formData.get("producerCredits") ?? "");
     const providedKey = String(formData.get("key") ?? "").trim();
     const parsedBpm = Number(formData.get("bpm") ?? 0);
-    const key = providedKey || "Unknown";
+    const key = formatKey(providedKey) || "Unknown";
     const bpm = Number.isFinite(parsedBpm) && parsedBpm > 0 ? parsedBpm : 0;
     const tags = parseTagsInput(String(formData.get("tags") ?? ""));
     const featured = String(formData.get("featured") ?? "false") === "true";

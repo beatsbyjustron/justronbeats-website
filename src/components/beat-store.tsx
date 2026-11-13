@@ -1,5 +1,6 @@
 "use client";
 
+import { formatKey, uniqueKeys } from "@/lib/musical-key";
 import { useEffect, useMemo, useState } from "react";
 import { BeatCard } from "@/components/beat-card";
 import { useGlobalAudioPlayer } from "@/components/global-audio-player-provider";
@@ -44,15 +45,14 @@ export function BeatStore({ beats, initiallyVisible = 3 }: BeatStoreProps) {
       const matchesKeyText = !query || beat.key.toLowerCase().includes(query);
       const matchesQuery = matchesTitle || matchesArtists || matchesTags || matchesBpmText || matchesKeyText;
 
-      const matchesKey = selectedKey === "all" || beat.key.toLowerCase() === selectedKey.toLowerCase();
+      const matchesKey = selectedKey === "all" || formatKey(beat.key) === formatKey(selectedKey);
       const matchesBpm = !hasBpmFilter || (beat.bpm >= bpmMin && beat.bpm <= bpmMax);
       return matchesQuery && matchesKey && matchesBpm;
     });
   }, [beats, searchQuery, selectedKey, bpmMin, bpmMax]);
 
   const keys = useMemo(() => {
-    const mapped = beats.map((beat) => beat.key).filter(Boolean);
-    return Array.from(new Set(mapped)).sort((a, b) => a.localeCompare(b));
+    return uniqueKeys(beats.map((beat) => beat.key));
   }, [beats]);
 
   const visibleBeats = useMemo(
