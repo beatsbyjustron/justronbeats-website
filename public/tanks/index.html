@@ -282,38 +282,128 @@ function seededRng(str) {
   r.shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
   return r;
 }
-const ARCHETYPES = ['pillars', 'corridors', 'rooms', 'crosses', 'fortress', 'elbows', 'stairs', 'lanes', 'river', 'islands', 'maze', 'checker', 'bunkers', 'diamond', 'ring', 'corkwall'];
-const EARLY_ARCH = ['pillars', 'crosses', 'corridors', 'elbows', 'lanes', 'islands', 'checker', 'bunkers', 'diamond'];
+const ARCHETYPES = ['corridors', 'trenches', 'zigzag', 'bases', 'rooms', 'crosshall', 'chicane', 'lanes', 'fortress', 'maze', 'river', 'corkwall', 'ring', 'blocks'];
+const EARLY_ARCH = ['corridors', 'trenches', 'bases', 'crosshall', 'lanes', 'chicane', 'blocks'];
 function genMap(m, roster, rng, primary) {
   const HW = COLS / 2, g = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
   const put = (x, y, t) => { if (x >= 0 && x < HW && y >= 0 && y < ROWS) g[y][x] = t; };
   const rect = (x, y, w, h, t) => { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) put(xx, yy, t); };
-  const tough = () => rng() < 0.75 ? 1 : 2;
+  const hl = (x0, x1, y, t = 1) => { for (let x = x0; x <= x1; x++) put(x, y, t); };
+  const vl = (x, y0, y1, t = 1) => { for (let y = y0; y <= y1; y++) put(x, y, t); };
+  const plug = () => (rng() < 0.35 ? 2 : 0); // doorways are sometimes blocked with cork you can blast
+  const doorV = (x, y) => { const t = plug(); put(x, y, t); put(x, y + 1, t); };
+  const doorH = (x, y) => { const t = plug(); put(x, y, t); put(x + 1, y, t); };
+  const thick = () => rng() < 0.35;
   const S = {
-    pillars() { for (let n = rng.int(4, 7); n--;) { const [w, h] = rng.pick([[1,1],[2,2],[1,3],[3,1],[2,1]]); rect(rng.int(3, 10), rng.int(1, 13), w, h, tough()); } },
-    corridors() { for (const x of rng.shuffle([4, 6, 8, 10]).slice(0, 2)) { const gaps = new Set(rng.shuffle([...Array(14)].map((_, i) => i + 1)).slice(0, 3)); for (let y = 0; y < ROWS; y++) if (!gaps.has(y) && !gaps.has(y - 1)) put(x, y, rng() < 0.85 ? 1 : 2); } },
-    rooms() { const x0 = rng.int(4, 6), y0 = rng.int(2, 4), x1 = 11, y1 = ROWS - 1 - y0; for (let x = x0; x <= x1; x++) { put(x, y0, 1); put(x, y1, 1); } for (let y = y0; y <= y1; y++) put(x0, y, 1); const d = rng.int(y0 + 2, y1 - 2); put(x0, d, 0); put(x0, d + 1, 0); const c = rng.int(x0 + 1, x1 - 2); put(c, y0, 2); put(c, y1, 2); },
-    crosses() { for (let n = rng.int(2, 4); n--;) { const cx = rng.int(4, 9), cy = rng.int(3, 12), t = rng() < 0.7 ? 1 : 2; for (let d = -1; d <= 1; d++) { put(cx + d, cy, t); put(cx, cy + d, t); } } },
-    fortress() { for (let y = 4; y < 12; y++) if (y !== 7 && y !== 8) put(9, y, 1); for (let x = 9; x < 12; x++) { put(x, 4, 1); put(x, 11, 1); } put(11, 4, 2); put(11, 11, 2); },
-    elbows() { for (let n = rng.int(2, 4); n--;) { const x = rng.int(3, 9), y = rng.int(1, 11), len = rng.int(2, 4), t = tough(), up = rng() < 0.5; for (let i = 0; i < len; i++) put(x + i, up ? y : y + len - 1, t); for (let i = 0; i < len; i++) put(x, y + i, t); } },
-    stairs() { const x0 = rng.int(3, 6), y0 = rng.int(1, 5), down = rng() < 0.5; for (let i = 0; i < 6; i++) { const y = down ? y0 + i : y0 + 6 - i; put(x0 + i, y, 1); put(x0 + i + 1, y, i % 3 === 2 ? 2 : 1); } },
-    lanes() { const ys = rng.pick([[4, 11], [3, 12], [5, 10]]); for (const y of ys) for (let x = rng.int(3, 5); x < HW; x++) if (x % 5 !== 2) put(x, y, rng() < 0.8 ? 1 : 2); },
-    // a line of holes down the middle with a few bridges: shells fly over, tanks don't
-    river() { const x = rng.pick([10, 11]); const br = new Set(); for (const b of rng.shuffle([2, 3, 7, 8, 12, 13]).slice(0, 2)) { br.add(b); br.add(b + 1); } for (let y = 0; y < ROWS; y++) if (!br.has(y)) put(x, y, 3); for (let n = rng.int(2, 3); n--;) rect(rng.int(4, 7), rng.int(1, 13), 1, rng.int(1, 2), tough()); },
-    islands() { for (let n = rng.int(2, 3); n--;) { const x = rng.int(3, 8), y = rng.int(1, 11); rect(x, y, 3, 3, 1); if (rng() < 0.6) put(x + 1, y + 1, 2); } },
-    maze() { for (const x of [4, 7, 10]) { const gap = rng.int(2, 12); for (let y = 1; y < ROWS - 1; y++) if (Math.abs(y - gap) > 1 && rng() < 0.75) put(x, y, rng() < 0.85 ? 1 : 2); } for (const y of [4, 11]) for (let x = 4; x < 11; x++) if (rng() < 0.35) put(x, y, 1); },
-    checker() { const off = rng.int(0, 1); for (let y = 1 + off; y < ROWS - 1; y += 3) for (let x = 3 + off; x < HW; x += 3) put(x, y, rng() < 0.8 ? 1 : 2); },
-    bunkers() { for (let n = rng.int(2, 3); n--;) { const x = rng.int(3, 8), y = rng.int(1, 11), t = tough(), dir = rng.int(0, 3); rect(x, y, 3, 1, t); rect(x, y + 2, 3, 1, t); if (dir < 2) rect(dir ? x + 2 : x, y, 1, 3, t); } },
-    diamond() { const cx = rng.int(8, 10), cy = rng.int(6, 9), r = rng.int(3, 4); for (let i = 0; i <= r; i++) { if (i === r >> 1) continue; put(cx - i, cy - r + i, 1); put(cx - i, cy + r - i, 1); } put(cx, cy, 2); },
-    ring() { const x0 = rng.int(5, 7), y0 = rng.int(3, 5); for (let x = x0; x < HW; x++) { if (x !== x0 + 2) { put(x, y0, 1); put(x, ROWS - 1 - y0, 1); } } for (let y = y0; y <= ROWS - 1 - y0; y++) if (y < 7 || y > 8) put(x0, y, 1); },
+    // long vertical walls with doorways, like the classic mission halls
+    corridors() {
+      const xs = [rng.int(4, 5), rng.int(8, 9)];
+      for (const x of xs) { vl(x, 0, ROWS - 1); for (const y of rng.shuffle([1, 4, 7, 10, 13]).slice(0, 2)) doorV(x, Math.min(ROWS - 2, y)); }
+      if (thick()) { const x = xs[1] + 1; for (let y = 0; y < ROWS; y++) if (g[y][xs[1]]) put(x, y, g[y][xs[1]]); }
+    },
+    // two long trenches across the map with a gap or two
+    trenches() {
+      const y = rng.int(3, 4), x0 = rng.int(3, 5);
+      for (const yy of [y, ROWS - 1 - y]) { hl(x0, HW - 1, yy); doorH(rng.int(6, 9), yy); }
+      vl(rng.int(6, 8), 6, 9, rng() < 0.7 ? 1 : 2);
+      if (thick()) { hl(x0, HW - 1, y + 1); doorH(rng.int(6, 9), y + 1); }
+    },
+    // walls that alternate from top and bottom: a snaking path
+    zigzag() {
+      const flip = rng() < 0.5, len = rng.int(9, 11);
+      vl(4, flip ? 0 : ROWS - len, flip ? len - 1 : ROWS - 1);
+      vl(8, flip ? ROWS - len : 0, flip ? ROWS - 1 : len - 1);
+      if (rng() < 0.5) vl(11, 5, 10, 2);
+    },
+    // a walled base on each side and a wall down the middle
+    bases() {
+      hl(1, 4, 3); hl(1, 4, ROWS - 4); vl(4, 3, 6); vl(4, ROWS - 7, ROWS - 4);
+      vl(HW - 1, rng.int(3, 5), ROWS - 1 - rng.int(3, 5));
+      vl(8, 0, rng.int(2, 3)); vl(8, ROWS - 1 - rng.int(2, 3), ROWS - 1);
+      if (rng() < 0.6) hl(7, 9, 7, 2);
+    },
+    // rooms joined by doorways
+    rooms() {
+      const x = rng.int(5, 7), y = rng.int(4, 6);
+      vl(x, 0, ROWS - 1); for (const d of rng.shuffle([1, 6, 11]).slice(0, 2)) doorV(x, d + 1);
+      hl(x, HW - 1, y); doorH(rng.int(x + 1, HW - 3), y);
+      hl(x, HW - 1, ROWS - 1 - y); doorH(rng.int(x + 1, HW - 3), ROWS - 1 - y);
+    },
+    // a thick cross in the middle that splits the map into four quarters
+    crosshall() {
+      const x0 = rng.int(4, 6);
+      hl(x0, HW - 1, 7); hl(x0, HW - 1, 8); const d = rng.int(x0 + 1, HW - 4); put(d, 7, 0); put(d, 8, 0); put(d + 1, 7, 0); put(d + 1, 8, 0);
+      vl(HW - 1, 0, ROWS - 1); doorV(HW - 1, rng.int(2, 4)); doorV(HW - 1, ROWS - 2 - rng.int(2, 4));
+    },
+    // L-shaped walls that force you to weave
+    chicane() {
+      const a = rng.int(2, 4), b = rng.int(7, 9);
+      hl(3, b, a); vl(b, a, a + rng.int(4, 6));
+      hl(5, HW - 1, ROWS - 1 - a); vl(5, ROWS - 1 - a - rng.int(4, 6), ROWS - 1 - a);
+    },
+    // long lanes with cork sections and cover in the middle
+    lanes() {
+      const y = rng.pick([4, 5]);
+      for (const yy of [y, ROWS - 1 - y]) { hl(3, HW - 1, yy); hl(rng.int(5, 8), rng.int(9, 10), yy, 2); }
+      vl(rng.int(7, 9), 7, 8); if (thick()) vl(HW - 1, 6, 9);
+    },
+    // a keep in the middle with two doors
+    fortress() {
+      const x0 = rng.int(7, 8), y0 = rng.int(3, 4);
+      hl(x0, HW - 1, y0); hl(x0, HW - 1, ROWS - 1 - y0); vl(x0, y0, ROWS - 1 - y0);
+      doorV(x0, rng.int(y0 + 1, 6)); doorV(x0, rng.int(8, ROWS - 3 - y0));
+      vl(4, rng.int(1, 3), rng.int(5, 6)); vl(4, rng.int(9, 10), ROWS - 1 - rng.int(1, 3));
+    },
+    // a proper maze of long segments
+    maze() {
+      vl(4, rng.int(0, 2), rng.int(6, 8)); vl(4, rng.int(10, 11), ROWS - 1);
+      vl(8, 0, rng.int(4, 5)); vl(8, rng.int(8, 9), rng.int(12, 15));
+      hl(4, 7, rng.int(10, 11)); hl(8, HW - 1, rng.int(6, 7)); hl(rng.int(5, 6), 8, rng.int(2, 3));
+    },
+    // a line of holes down the middle with a couple of bridges: shells fly over, tanks don't
+    river() {
+      const x = rng.pick([10, 11]); const br = new Set();
+      for (const b of rng.shuffle([2, 7, 12]).slice(0, 2)) { br.add(b); br.add(b + 1); }
+      for (let y = 0; y < ROWS; y++) if (!br.has(y)) put(x, y, 3);
+      vl(6, rng.int(1, 3), rng.int(5, 6)); vl(6, rng.int(9, 10), ROWS - 1 - rng.int(1, 3));
+    },
     // a cork wall across the map: blast your way through
-    corkwall() { const x = rng.int(8, 10); for (let y = 0; y < ROWS; y++) put(x, y, 2); for (const y of rng.shuffle([2, 5, 10, 13]).slice(0, 2)) put(x, y, 1); for (let n = rng.int(1, 3); n--;) rect(rng.int(3, 6), rng.int(2, 12), 1, 2, 1); }
+    corkwall() {
+      const x = rng.int(9, 10); vl(x, 0, ROWS - 1, 2); for (const y of rng.shuffle([2, 5, 10, 13]).slice(0, 2)) put(x, y, 1);
+      hl(3, 6, rng.int(3, 4)); hl(3, 6, ROWS - 1 - rng.int(3, 4));
+    },
+    // a ring around the centre with gaps
+    ring() {
+      const x0 = rng.int(5, 7), y0 = rng.int(2, 4);
+      hl(x0, HW - 1, y0); hl(x0, HW - 1, ROWS - 1 - y0); vl(x0, y0, ROWS - 1 - y0);
+      doorV(x0, 7); doorH(rng.int(x0 + 1, HW - 2), y0); doorH(rng.int(x0 + 1, HW - 2), ROWS - 1 - y0);
+      if (rng() < 0.6) rect(HW - 2, 7, 2, 2, 1);
+    },
+    // big chunky blocks with lanes between them
+    blocks() {
+      const ys = rng.pick([[1, 6, 11], [2, 7, 12]]), [w, h] = rng.pick([[2, 3], [3, 2], [2, 2]]);
+      for (const y of ys) for (const x of [4, 8]) if (rng() < 0.85) rect(x, y, w, Math.min(h, ROWS - y), rng() < 0.85 ? 1 : 2);
+    }
   };
   const early = m < 10;
   S[primary]();
-  if (!early && rng() < 0.6) S[rng.pick(['pillars', 'crosses', 'elbows', 'checker', 'bunkers'])]();
-  if (m >= 3 && primary !== 'river') for (let n = rng.int(0, m < 15 ? 1 : 3); n--;) { const x = rng.int(3, 10), y = rng.int(1, 14); if (!g[y][x]) put(x, y, 3); }
-  for (let n = rng.int(0, 3); n--;) { const x = rng.int(3, 11), y = rng.int(0, 15); if (!g[y][x]) put(x, y, 2); }
+  // fill any big empty patch on this side with a short wall so there's always cover
+  const bigSquare = (grid2, x0, x1) => {
+    let best = 0, at = null; const dp = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+    for (let y = 0; y < ROWS; y++) for (let x = x0; x <= x1; x++) {
+      if (grid2[y][x]) continue;
+      dp[y][x] = (y && x > x0) ? 1 + Math.min(dp[y - 1][x], dp[y][x - 1], dp[y - 1][x - 1]) : 1;
+      if (dp[y][x] > best) { best = dp[y][x]; at = [x, y]; }
+    }
+    return { best, at };
+  };
+  for (let k = 0; k < 3; k++) {
+    const { best, at } = bigSquare(g, 2, HW - 1);
+    if (best <= 6) break;
+    const cx = at[0] - (best >> 1), cy = at[1] - (best >> 1);
+    if (rng() < 0.5) hl(Math.max(2, cx - 1), Math.min(HW - 1, cx + 2), cy, rng() < 0.8 ? 1 : 2); else vl(cx, Math.max(0, cy - 1), Math.min(ROWS - 1, cy + 2), rng() < 0.8 ? 1 : 2);
+  }
+  if (m >= 3 && primary !== 'river') for (let n = rng.int(0, m < 15 ? 1 : 2); n--;) { const x = rng.int(3, 10), y = rng.int(1, 14); if (!g[y][x]) put(x, y, 3); }
   if (Math.floor(m / 5) === 8) for (let n = rng.int(3, 5); n--;) { const x = rng.int(3, 10), y = rng.int(1, 14); if (!g[y][x]) put(x, y, 3); }
   // symmetry: mirror left/right, spin it 180°, or mirror both ways
   const sym = primary === 'river' || primary === 'corkwall' ? rng.pick(['mirror', 'spin']) : rng.pick(['mirror', 'mirror', 'spin', 'spin', 'quad']);
@@ -323,7 +413,19 @@ function genMap(m, roster, rng, primary) {
   }
   let fill = 0; for (const row of g) for (const v of row) if (v) fill++;
   fill /= COLS * ROWS;
-  if (fill < (early ? 0.05 : 0.08) || fill > (early ? 0.26 : 0.34)) return null;
+  if (fill < (early ? 0.08 : 0.1) || fill > (early ? 0.3 : 0.36)) return null;
+  // structure checks: no big empty fields, and walls come in long runs, not loose single blocks
+  { let best = 0; const dp = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { if (g[y][x]) continue; dp[y][x] = (y && x) ? 1 + Math.min(dp[y - 1][x], dp[y][x - 1], dp[y - 1][x - 1]) : 1; best = Math.max(best, dp[y][x]); }
+    if (best > (early ? 7 : 6)) return null; }
+  { const solid = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && (g[y][x] === 1 || g[y][x] === 2);
+    let n = 0, ok = 0;
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      if (!solid(x, y)) continue; n++;
+      let h = 1, v = 1; for (let i = 1; solid(x - i, y); i++) h++; for (let i = 1; solid(x + i, y); i++) h++; for (let i = 1; solid(x, y - i); i++) v++; for (let i = 1; solid(x, y + i); i++) v++;
+      if (h >= 3 || v >= 3) ok++;
+    }
+    if (n && ok / n < 0.85) return null; }
   const free = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !g[y][x];
   const open = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!free(x + dx, y + dy)) return false; return true; };
   // player start: left middle, or a left corner
@@ -357,7 +459,7 @@ if (MAPS.weekly) {
     if (m > 0 && LEVELS[m - 1].arch === primary && deck.length) { deck.push(primary); primary = deck.shift(); }
     const roster = CLASSIC[m].e.map(e => e[0]);
     let L = null;
-    for (let tries = 0; !L && tries < 900; tries++) L = genMap(m, roster, seededRng(mapWeek.key + '#' + m + '#' + tries), tries < 600 ? primary : 'pillars');
+    for (let tries = 0; !L && tries < 900; tries++) L = genMap(m, roster, seededRng(mapWeek.key + '#' + m + '#' + tries), tries < 600 ? primary : 'blocks');
     if (L) LEVELS[m] = L;
   }
 }
@@ -1934,7 +2036,7 @@ function weeklyChallenge() {
   const roster = Array.from({ length: info.id === 'double' ? 10 : 6 }, () => r.pick(pool));
   const arch = r.pick(ARCHETYPES.filter(a => a !== 'corkwall'));
   let level = null;
-  for (let tries = 0; !level && tries < 900; tries++) level = genMap(theme * 5 + 2, roster, seededRng(mapWeek.key + '#ch#' + tries), tries < 600 ? arch : 'pillars');
+  for (let tries = 0; !level && tries < 900; tries++) level = genMap(theme * 5 + 2, roster, seededRng(mapWeek.key + '#ch#' + tries), tries < 600 ? arch : 'blocks');
   return { twist: info.id, info, theme, level: level || CLASSIC[20] };
 }
 const weekly = () => WEEKLY || (WEEKLY = weeklyChallenge());
