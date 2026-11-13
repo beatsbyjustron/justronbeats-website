@@ -97,6 +97,16 @@
   body.touch #hud{gap:10px;font-size:10px;height:24px;position:fixed;z-index:30;top:calc(4px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:rgba(0,0,0,.62);border:1px solid #27272a;border-radius:999px;padding:0 12px;white-space:nowrap}
   body.touch #hud button{padding:2px 9px;font-size:10px}
   body.touch .panel .notouch{display:none}
+  /* phones in landscape: stats in the left rail, now-playing in the right rail, nothing over the arena */
+  body.touch.rails #hud{box-sizing:border-box;left:calc(env(safe-area-inset-left) + 10px);top:calc(env(safe-area-inset-top) + 10px);transform:none;width:calc(var(--rail) - 20px);height:auto;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:5px 10px;background:none;border:none;padding:0;white-space:normal;font-size:10px}
+  body.touch.rails #hud span b{font-size:13px}
+  body.touch.rails #hud .hearts{font-size:12px}
+  body.touch.rails #np{position:fixed;box-sizing:border-box;left:auto;bottom:auto;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 10px);width:calc(var(--rail) - 20px);max-width:none;white-space:normal;border-radius:14px;font-size:11px;line-height:1.45;padding:8px 10px;z-index:30}
+  @media (max-height:300px){body.touch.rails #np{font-size:10px;line-height:1.35;padding:6px 8px;top:calc(env(safe-area-inset-top) + 6px)}body.touch.rails #touch #mineBtn{bottom:calc(env(safe-area-inset-bottom) + var(--stick) + 30px)}}
+body.touch.rails #touch .stick{width:var(--stick);height:var(--stick)}
+  body.touch.rails #touch #stickL{left:calc(env(safe-area-inset-left) + max(8px, (var(--rail) - var(--stick)) / 2))}
+  body.touch.rails #touch #stickR{right:calc(env(safe-area-inset-right) + max(8px, (var(--rail) - var(--stick)) / 2))}
+  body.touch.rails #touch #mineBtn{right:calc(env(safe-area-inset-right) + max(8px, (var(--rail) - 88px) / 2));bottom:calc(env(safe-area-inset-bottom) + var(--stick) + 40px)}
   body.touch .panel{max-width:min(560px,92vw)}
   body.touch #hud span b{font-size:12px}
   body.touch #storeLink, body.touch #volSlider{display:none}
@@ -297,6 +307,14 @@ function fit() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
   scale = canvas.width / W;
+  // phones: use the empty space beside the arena for the HUD and now-playing card
+  if (document.documentElement && document.documentElement.style && document.body && document.body.classList) {
+    const rail = Math.max(0, (vw - cw) / 2);
+    const stick = vh < 330 ? 104 : 124;
+    document.documentElement.style.setProperty('--rail', rail + 'px');
+    document.documentElement.style.setProperty('--stick', stick + 'px');
+    document.body.classList.toggle('rails', touchMode && rail >= 130);
+  }
   if (grid) drawBg();
 }
 window.addEventListener('resize', fit);
