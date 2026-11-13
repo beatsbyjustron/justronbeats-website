@@ -23,3 +23,15 @@ alter table public.tank_scores enable row level security;
 
 -- Choose which beats play in Justron Tanks (all on by default).
 alter table public.beats add column if not exists in_tanks boolean not null default true;
+
+-- Weekly challenge: fastest clear per player per week.
+create table if not exists public.tank_challenge (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  week date not null,
+  time_ms integer not null check (time_ms between 3000 and 3600000),
+  twist text not null default '',
+  updated_at timestamptz not null default now(),
+  primary key (user_id, week)
+);
+create index if not exists tank_challenge_week_idx on public.tank_challenge (week, time_ms);
+alter table public.tank_challenge enable row level security;
