@@ -281,12 +281,15 @@ function seededRng(str) {
   r.shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
   return r;
 }
-function genMap(m, roster, rng) {
+const ARCHETYPES = ['pillars', 'corridors', 'rooms', 'crosses', 'fortress', 'elbows', 'stairs', 'lanes', 'river', 'islands', 'maze', 'checker', 'bunkers', 'diamond', 'ring', 'corkwall'];
+const EARLY_ARCH = ['pillars', 'crosses', 'corridors', 'elbows', 'lanes', 'islands', 'checker', 'bunkers', 'diamond'];
+function genMap(m, roster, rng, primary) {
   const HW = COLS / 2, g = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
   const put = (x, y, t) => { if (x >= 0 && x < HW && y >= 0 && y < ROWS) g[y][x] = t; };
+  const rect = (x, y, w, h, t) => { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) put(xx, yy, t); };
   const tough = () => rng() < 0.75 ? 1 : 2;
   const S = {
-    pillars() { for (let n = rng.int(4, 7); n--;) { const x = rng.int(3, 10), y = rng.int(1, 13), [w, h] = rng.pick([[1,1],[2,2],[1,3],[3,1],[2,1]]), t = tough(); for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) put(xx, yy, t); } },
+    pillars() { for (let n = rng.int(4, 7); n--;) { const [w, h] = rng.pick([[1,1],[2,2],[1,3],[3,1],[2,1]]); rect(rng.int(3, 10), rng.int(1, 13), w, h, tough()); } },
     corridors() { for (const x of rng.shuffle([4, 6, 8, 10]).slice(0, 2)) { const gaps = new Set(rng.shuffle([...Array(14)].map((_, i) => i + 1)).slice(0, 3)); for (let y = 0; y < ROWS; y++) if (!gaps.has(y) && !gaps.has(y - 1)) put(x, y, rng() < 0.85 ? 1 : 2); } },
     rooms() { const x0 = rng.int(4, 6), y0 = rng.int(2, 4), x1 = 11, y1 = ROWS - 1 - y0; for (let x = x0; x <= x1; x++) { put(x, y0, 1); put(x, y1, 1); } for (let y = y0; y <= y1; y++) put(x0, y, 1); const d = rng.int(y0 + 2, y1 - 2); put(x0, d, 0); put(x0, d + 1, 0); const c = rng.int(x0 + 1, x1 - 2); put(c, y0, 2); put(c, y1, 2); },
     crosses() { for (let n = rng.int(2, 4); n--;) { const cx = rng.int(4, 9), cy = rng.int(3, 12), t = rng() < 0.7 ? 1 : 2; for (let d = -1; d <= 1; d++) { put(cx + d, cy, t); put(cx, cy + d, t); } } },
@@ -294,38 +297,65 @@ function genMap(m, roster, rng) {
     elbows() { for (let n = rng.int(2, 4); n--;) { const x = rng.int(3, 9), y = rng.int(1, 11), len = rng.int(2, 4), t = tough(), up = rng() < 0.5; for (let i = 0; i < len; i++) put(x + i, up ? y : y + len - 1, t); for (let i = 0; i < len; i++) put(x, y + i, t); } },
     stairs() { const x0 = rng.int(3, 6), y0 = rng.int(1, 5), down = rng() < 0.5; for (let i = 0; i < 6; i++) { const y = down ? y0 + i : y0 + 6 - i; put(x0 + i, y, 1); put(x0 + i + 1, y, i % 3 === 2 ? 2 : 1); } },
     lanes() { const ys = rng.pick([[4, 11], [3, 12], [5, 10]]); for (const y of ys) for (let x = rng.int(3, 5); x < HW; x++) if (x % 5 !== 2) put(x, y, rng() < 0.8 ? 1 : 2); },
-    scatter() { for (let n = rng.int(8, 14); n--;) put(rng.int(3, 11), rng.int(0, 15), rng() < 0.55 ? 2 : 1); }
+    // a line of holes down the middle with a few bridges: shells fly over, tanks don't
+    river() { const x = rng.pick([10, 11]); const br = new Set(); for (const b of rng.shuffle([2, 3, 7, 8, 12, 13]).slice(0, 2)) { br.add(b); br.add(b + 1); } for (let y = 0; y < ROWS; y++) if (!br.has(y)) put(x, y, 3); for (let n = rng.int(2, 3); n--;) rect(rng.int(4, 7), rng.int(1, 13), 1, rng.int(1, 2), tough()); },
+    islands() { for (let n = rng.int(2, 3); n--;) { const x = rng.int(3, 8), y = rng.int(1, 11); rect(x, y, 3, 3, 1); if (rng() < 0.6) put(x + 1, y + 1, 2); } },
+    maze() { for (const x of [4, 7, 10]) { const gap = rng.int(2, 12); for (let y = 1; y < ROWS - 1; y++) if (Math.abs(y - gap) > 1 && rng() < 0.75) put(x, y, rng() < 0.85 ? 1 : 2); } for (const y of [4, 11]) for (let x = 4; x < 11; x++) if (rng() < 0.35) put(x, y, 1); },
+    checker() { const off = rng.int(0, 1); for (let y = 1 + off; y < ROWS - 1; y += 3) for (let x = 3 + off; x < HW; x += 3) put(x, y, rng() < 0.8 ? 1 : 2); },
+    bunkers() { for (let n = rng.int(2, 3); n--;) { const x = rng.int(3, 8), y = rng.int(1, 11), t = tough(), dir = rng.int(0, 3); rect(x, y, 3, 1, t); rect(x, y + 2, 3, 1, t); if (dir < 2) rect(dir ? x + 2 : x, y, 1, 3, t); } },
+    diamond() { const cx = rng.int(8, 10), cy = rng.int(6, 9), r = rng.int(3, 4); for (let i = 0; i <= r; i++) { if (i === r >> 1) continue; put(cx - i, cy - r + i, 1); put(cx - i, cy + r - i, 1); } put(cx, cy, 2); },
+    ring() { const x0 = rng.int(5, 7), y0 = rng.int(3, 5); for (let x = x0; x < HW; x++) { if (x !== x0 + 2) { put(x, y0, 1); put(x, ROWS - 1 - y0, 1); } } for (let y = y0; y <= ROWS - 1 - y0; y++) if (y < 7 || y > 8) put(x0, y, 1); },
+    // a cork wall across the map: blast your way through
+    corkwall() { const x = rng.int(8, 10); for (let y = 0; y < ROWS; y++) put(x, y, 2); for (const y of rng.shuffle([2, 5, 10, 13]).slice(0, 2)) put(x, y, 1); for (let n = rng.int(1, 3); n--;) rect(rng.int(3, 6), rng.int(2, 12), 1, 2, 1); }
   };
-  const early = m < 10, styles = early ? ['pillars', 'crosses', 'corridors', 'elbows', 'lanes'] : Object.keys(S);
-  for (const st of rng.shuffle(styles.slice()).slice(0, early ? 1 : rng.int(1, 2))) S[st]();
-  if (m >= 3) for (let n = rng.int(0, m < 15 ? 1 : 3); n--;) { const x = rng.int(3, 10), y = rng.int(1, 14); if (!g[y][x]) put(x, y, 3); }
-  for (let n = rng.int(1, 4); n--;) { const x = rng.int(3, 11), y = rng.int(0, 15); if (!g[y][x]) put(x, y, 2); }
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < HW; x++) g[y][COLS - 1 - x] = g[y][x];
+  const early = m < 10;
+  S[primary]();
+  if (!early && rng() < 0.6) S[rng.pick(['pillars', 'crosses', 'elbows', 'checker', 'bunkers'])]();
+  if (m >= 3 && primary !== 'river') for (let n = rng.int(0, m < 15 ? 1 : 3); n--;) { const x = rng.int(3, 10), y = rng.int(1, 14); if (!g[y][x]) put(x, y, 3); }
+  for (let n = rng.int(0, 3); n--;) { const x = rng.int(3, 11), y = rng.int(0, 15); if (!g[y][x]) put(x, y, 2); }
+  // symmetry: mirror left/right, spin it 180°, or mirror both ways
+  const sym = primary === 'river' || primary === 'corkwall' ? rng.pick(['mirror', 'spin']) : rng.pick(['mirror', 'mirror', 'spin', 'spin', 'quad']);
+  if (sym === 'quad') for (let y = 0; y < ROWS / 2; y++) for (let x = 0; x < HW; x++) g[ROWS - 1 - y][x] = g[y][x];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < HW; x++) {
+    if (sym === 'spin') g[ROWS - 1 - y][COLS - 1 - x] = g[y][x]; else g[y][COLS - 1 - x] = g[y][x];
+  }
   let fill = 0; for (const row of g) for (const v of row) if (v) fill++;
   fill /= COLS * ROWS;
-  if (fill < (early ? 0.06 : 0.1) || fill > (early ? 0.24 : 0.32)) return null;
-  const open = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const a = x + dx, b = y + dy; if (a < 0 || b < 0 || a >= COLS || b >= ROWS || g[b][a]) return false; } return true; };
-  const py = rng.int(3, 12);
-  if (!open(1, py)) return null;
-  const seen = new Set([1 + ',' + py]), q = [[1, py]], reach = [];
-  while (q.length) { const [x, y] = q.shift(); reach.push([x, y]); for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const a = x + dx, b = y + dy, k = a + ',' + b; if (a >= 0 && b >= 0 && a < COLS && b < ROWS && !g[b][a] && !seen.has(k)) { seen.add(k); q.push([a, b]); } } }
-  if (reach.length < 0.6 * COLS * ROWS) return null;
-  const cells = rng.shuffle(reach.filter(([x, y]) => x >= 13 || (x >= 9 && (y <= 2 || y >= 13))));
-  const placed = [], d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  if (fill < (early ? 0.05 : 0.08) || fill > (early ? 0.26 : 0.34)) return null;
+  const free = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !g[y][x];
+  const open = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!free(x + dx, y + dy)) return false; return true; };
+  // player start: left middle, or a left corner
+  const spot = rng() < 0.65 ? [1, rng.int(3, 12)] : [1, rng.pick([1, 14])];
+  if (!open(spot[0], spot[1]) && !(free(...spot) && free(spot[0] + 1, spot[1]) && free(spot[0], spot[1] + (spot[1] < 8 ? 1 : -1)))) return null;
+  // reachable floor; cork counts as passable because you can shoot through it
+  const walk = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && (g[y][x] === 0 || g[y][x] === 2);
+  const seen = new Set([spot.join()]), q = [spot], reach = [];
+  while (q.length) { const [x, y] = q.shift(); if (!g[y][x]) reach.push([x, y]); for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const a = x + dx, b = y + dy, k = a + ',' + b; if (walk(a, b) && !seen.has(k)) { seen.add(k); q.push([a, b]); } } }
+  if (reach.length < 0.58 * COLS * ROWS) return null;
+  const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const cells = rng.shuffle(reach.filter(c => c[0] >= 8 && d(c, spot) >= 10));
+  const placed = [];
   for (const t of roster) {
-    const c = cells.find(c => !(t === 'B' && c[0] < 16) && d(c, [1, py]) >= 10 && !placed.some(p => d(c, [p[1], p[2]]) < (t === 'B' || p[0] === 'B' ? 3 : 2.2)) && (t !== 'B' || open(c[0], c[1])));
+    const c = cells.find(c => !(t === 'B' && (c[0] < 15 || d(c, spot) < 13)) && !placed.some(p => d(c, [p[1], p[2]]) < (t === 'B' || p[0] === 'B' ? 3 : 2.2)) && (t !== 'B' || open(c[0], c[1])));
     if (!c) return null;
     placed.push([t, c[0], c[1]]);
   }
   const w = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS;) { const v = g[y][x]; if (!v) { x++; continue; } let x2 = x; while (x2 + 1 < COLS && g[y][x2 + 1] === v) x2++; w.push(v === 1 ? [x, y, x2 - x + 1, 1] : [x, y, x2 - x + 1, 1, v === 2 ? 'x' : 'o']); x = x2 + 1; }
-  return { p: [1, py], w, e: placed };
+  return { p: spot, w, e: placed, arch: primary, sym };
 }
 if (MAPS.weekly) {
+  // deal this week's layouts like cards so neighbouring missions never repeat a style
+  const deckRng = seededRng(mapWeek.key + '#deck');
+  let deck = [];
   for (let m = 0; m < CLASSIC.length; m++) {
+    const pool = m < 10 ? EARLY_ARCH : ARCHETYPES;
+    if (!deck.length || m === 10) deck = deckRng.shuffle(pool.slice());
+    let primary = deck.shift();
+    if (m > 0 && LEVELS[m - 1].arch === primary && deck.length) { deck.push(primary); primary = deck.shift(); }
     const roster = CLASSIC[m].e.map(e => e[0]);
     let L = null;
-    for (let tries = 0; !L && tries < 600; tries++) L = genMap(m, roster, seededRng(mapWeek.key + '#' + m + '#' + tries));
+    for (let tries = 0; !L && tries < 900; tries++) L = genMap(m, roster, seededRng(mapWeek.key + '#' + m + '#' + tries), tries < 600 ? primary : 'pillars');
     if (L) LEVELS[m] = L;
   }
 }
@@ -1297,7 +1327,7 @@ function renderOverlay() {
     const seen = seenTypesBefore(mission);
     const chips = Object.keys(counts).map(k => `<span class="chip"><i style="background:${TYPES[k].color}"></i>${TYPES[k].name} ×${counts[k]}${seen.has(k) ? '' : ' <span class="new">NEW</span>'}</span>`).join('');
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    html = `<div class="banner"><p class="small" style="letter-spacing:.3em">WORLD ${worldOf(mission) + 1} · ${esc((customBeat ? customName : curBeat().beat).toUpperCase())}</p><h2>MISSION ${mission + 1}</h2><p>Enemy tanks: ${total}</p><div class="chips">${chips}</div><p class="small">Click or press Enter to begin</p></div>`;
+    html = `<div class="banner"><p class="small" style="letter-spacing:.3em">WORLD ${worldOf(mission) + 1} · ${esc(curTheme().name.toUpperCase())}</p><p class="small" style="margin:4px 0 10px;opacity:.8">♪ ${esc(customBeat ? customName : curBeat().beat)}</p><h2>MISSION ${mission + 1}</h2><p>Enemy tanks: ${total}</p><div class="chips">${chips}</div><p class="small">Click or press Enter to begin</p></div>`;
   } else if (state === 'paused') {
     html = `<div class="panel"><h2>PAUSED</h2>
       <div class="row"><button class="btn" data-act="resume">Resume</button></div>
@@ -1689,55 +1719,130 @@ function update(dt) {
 }
 
 // ---------- Rendering ----------
+// ---------- World themes: each world gets its own arena look ----------
+const THEMES = [
+  { name: 'The Studio',    floor: '#141417', slab: [255,255,255], line: 'rgba(255,255,255,.035)', wall: ['#2e2e35', '#4a4a53', '#33333a'], cork: ['#58534d', '#6f6962'], pit: 'void',  edge: 'rgba(52,211,153,.18)', deco: 'specks' },
+  { name: 'Vinyl Lounge',  floor: '#18110d', slab: [255,200,150], line: 'rgba(0,0,0,.35)', wall: ['#09090a', '#1c1c1f', '#0d0d0f'], cork: ['#5c4330', '#74563d'], pit: 'void', edge: 'rgba(190,242,100,.2)', deco: 'planks', wallStyle: 'record' },
+  { name: 'Drill Yard',    floor: '#161617', slab: [255,255,255], line: 'rgba(255,255,255,.02)', wall: ['#5b5852', '#8a857c', '#6a665f'], cork: ['#4d4237', '#66574a'], pit: 'void', edge: 'rgba(250,204,21,.25)', deco: 'asphalt', wallStyle: 'barrier' },
+  { name: 'The Deep',      floor: '#0a1724', slab: [120,200,255], line: 'rgba(120,200,255,.07)', wall: ['#123c47', '#1f6170', '#174b57'], cork: ['#4a5a5e', '#617478'], pit: 'water', edge: 'rgba(120,220,255,.35)', deco: 'caustics', wallStyle: 'tile' },
+  { name: 'Neon District', floor: '#0c0613', slab: [236,72,153], line: 'rgba(236,72,153,.10)', wall: ['#160b24', '#24123a', '#1a0d2c'], cork: ['#3b2350', '#4f2f6a'], pit: 'void', edge: 'rgba(236,72,153,.5)', deco: 'neon', wallStyle: 'neon', glow: '#ec4899' },
+  { name: 'Dunes',         floor: '#241c12', slab: [255,220,160], line: 'rgba(255,220,160,.03)', wall: ['#6e5230', '#9c7a4a', '#82643b'], cork: ['#5a4630', '#73593c'], pit: 'void', edge: 'rgba(253,186,116,.25)', deco: 'ripples', wallStyle: 'sandstone' },
+  { name: 'Frostbite',     floor: '#111c25', slab: [200,230,255], line: 'rgba(200,230,255,.05)', wall: ['#5c7f96', '#9cc3db', '#79a0b8'], cork: ['#4c5a66', '#64737f'], pit: 'water', edge: 'rgba(200,240,255,.45)', deco: 'ice', wallStyle: 'ice' },
+  { name: 'Overgrowth',    floor: '#0e170f', slab: [150,255,150], line: 'rgba(150,255,150,.03)', wall: ['#2f3a2c', '#4b5946', '#3a4636'], cork: ['#4e4130', '#665540'], pit: 'void', edge: 'rgba(132,204,22,.3)', deco: 'grass', wallStyle: 'moss' },
+  { name: 'Magma',         floor: '#120b09', slab: [255,120,60], line: 'rgba(255,120,60,.03)', wall: ['#3a2a24', '#5a4339', '#45332b'], cork: ['#4a2f22', '#62402e'], pit: 'lava', edge: 'rgba(251,146,60,.6)', deco: 'cracks', wallStyle: 'basalt' },
+  { name: 'Gold Room',     floor: '#0b0b0d', slab: [255,230,160], line: 'rgba(212,175,55,.06)', wall: ['#1c1a14', '#34302a', '#24211b'], cork: ['#4a3f2a', '#615338'], pit: 'void', edge: 'rgba(212,175,55,.5)', deco: 'marble', wallStyle: 'gold' },
+];
+const curTheme = () => THEMES[Math.min(THEMES.length - 1, worldOf(mission))];
+
 function drawBg() {
   bg.width = canvas.width; bg.height = canvas.height;
-  const b = bg.getContext('2d');
+  const b = bg.getContext('2d'), th = curTheme();
   b.setTransform(scale, 0, 0, scale, 0, 0);
   let seed = 1234 + mission * 77;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  // dark concrete floor slabs
-  b.fillStyle = '#141417'; b.fillRect(0, 0, W, H);
-  for (let cy = 0; cy < ROWS; cy += 2) for (let cx = 0; cx < COLS; cx += 2) {
-    b.fillStyle = `rgba(255,255,255,${0.012 + rnd() * 0.02})`;
-    b.fillRect(cx * TILE, cy * TILE, TILE * 2, TILE * 2);
+  const [sr, sg, sb] = th.slab;
+  b.fillStyle = th.floor; b.fillRect(0, 0, W, H);
+  // ---- floor
+  if (th.deco === 'planks') {
+    for (let y = 0; y < H; y += 20) { let x = -rnd() * 120; while (x < W) { const len = 80 + rnd() * 120; b.fillStyle = `rgba(${sr},${sg},${sb},${0.025 + rnd() * 0.04})`; b.fillRect(x, y, len - 2, 18); x += len; } }
+  } else if (th.deco === 'asphalt') {
+    for (let i = 0; i < 2600; i++) { b.fillStyle = `rgba(255,255,255,${rnd() * 0.05})`; b.fillRect(rnd() * W, rnd() * H, 1.2, 1.2); }
+    b.fillStyle = 'rgba(250,204,21,.16)';
+    for (let x = TILE * 3; x < W - TILE * 2; x += TILE * 3) { b.fillRect(x, 6, 3, TILE * 1.4); b.fillRect(x, H - 6 - TILE * 1.4, 3, TILE * 1.4); }
+    for (let x = 20; x < W; x += 60) b.fillRect(x, H / 2 - 2, 30, 4);
+  } else if (th.deco === 'caustics') {
+    for (let i = 0; i < 70; i++) { const x = rnd() * W, y = rnd() * H, r = 20 + rnd() * 60, g = b.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(120,210,255,.06)'); g.addColorStop(1, 'rgba(120,210,255,0)'); b.fillStyle = g; b.fillRect(x - r, y - r, r * 2, r * 2); }
+  } else if (th.deco === 'neon') {
+    b.strokeStyle = 'rgba(236,72,153,.13)'; b.lineWidth = 1.5;
+    for (let x = 0; x <= W; x += TILE * 2) { b.beginPath(); b.moveTo(x, 0); b.lineTo(x, H); b.stroke(); }
+    for (let y = 0; y <= H; y += TILE * 2) { b.beginPath(); b.moveTo(0, y); b.lineTo(W, y); b.stroke(); }
+    const g = b.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(56,189,248,.05)'); g.addColorStop(1, 'rgba(236,72,153,.07)'); b.fillStyle = g; b.fillRect(0, 0, W, H);
+  } else if (th.deco === 'ripples') {
+    b.strokeStyle = 'rgba(255,220,160,.05)'; b.lineWidth = 2;
+    for (let y = -20; y < H + 20; y += 18) { b.beginPath(); for (let x = 0; x <= W; x += 20) b.lineTo(x, y + Math.sin(x / 70 + y * 0.05) * 7); b.stroke(); }
+  } else if (th.deco === 'ice') {
+    for (let i = 0; i < 26; i++) { let x = rnd() * W, y = rnd() * H; b.strokeStyle = `rgba(220,240,255,${0.05 + rnd() * 0.06})`; b.lineWidth = 1; b.beginPath(); b.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (rnd() - 0.5) * 70; y += (rnd() - 0.5) * 70; b.lineTo(x, y); } b.stroke(); }
+    for (let i = 0; i < 500; i++) { b.fillStyle = `rgba(255,255,255,${rnd() * 0.07})`; b.fillRect(rnd() * W, rnd() * H, 1.5, 1.5); }
+  } else if (th.deco === 'grass') {
+    for (let i = 0; i < 1800; i++) { const x = rnd() * W, y = rnd() * H; b.strokeStyle = `rgba(${90 + rnd() * 60},${160 + rnd() * 60},80,${0.05 + rnd() * 0.07})`; b.lineWidth = 1; b.beginPath(); b.moveTo(x, y); b.lineTo(x + (rnd() - 0.5) * 4, y - 3 - rnd() * 4); b.stroke(); }
+  } else if (th.deco === 'cracks') {
+    for (let i = 0; i < 18; i++) { let x = rnd() * W, y = rnd() * H; b.strokeStyle = 'rgba(251,113,33,.22)'; b.lineWidth = 1.4; b.shadowColor = '#f97316'; b.shadowBlur = 6; b.beginPath(); b.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - 0.5) * 60; y += (rnd() - 0.5) * 60; b.lineTo(x, y); } b.stroke(); }
+    b.shadowBlur = 0;
+  } else if (th.deco === 'marble') {
+    for (let i = 0; i < 14; i++) { let x = rnd() * W, y = rnd() * H; b.strokeStyle = 'rgba(255,255,255,.035)'; b.lineWidth = 1 + rnd() * 2; b.beginPath(); b.moveTo(x, y); for (let k = 0; k < 6; k++) { x += 20 + rnd() * 50; y += (rnd() - 0.5) * 50; b.lineTo(x, y); } b.stroke(); }
+    b.strokeStyle = 'rgba(212,175,55,.18)'; b.lineWidth = 2; b.strokeRect(10, 10, W - 20, H - 20);
   }
-  for (let i = 0; i < 900; i++) { b.fillStyle = `rgba(255,255,255,${rnd() * 0.035})`; b.fillRect(rnd() * W, rnd() * H, 1.5, 1.5); }
-  b.strokeStyle = 'rgba(255,255,255,.035)'; b.lineWidth = 1;
+  if (th.deco !== 'planks' && th.deco !== 'neon') for (let cy = 0; cy < ROWS; cy += 2) for (let cx = 0; cx < COLS; cx += 2) { b.fillStyle = `rgba(${sr},${sg},${sb},${0.01 + rnd() * 0.018})`; b.fillRect(cx * TILE, cy * TILE, TILE * 2, TILE * 2); }
+  if (th.deco === 'specks') for (let i = 0; i < 900; i++) { b.fillStyle = `rgba(255,255,255,${rnd() * 0.035})`; b.fillRect(rnd() * W, rnd() * H, 1.5, 1.5); }
+  b.strokeStyle = th.line; b.lineWidth = 1;
   for (let x = 0; x <= W; x += TILE) { b.beginPath(); b.moveTo(x + .5, 0); b.lineTo(x + .5, H); b.stroke(); }
   for (let y = 0; y <= H; y += TILE) { b.beginPath(); b.moveTo(0, y + .5); b.lineTo(W, y + .5); b.stroke(); }
-  b.strokeStyle = 'rgba(255,255,255,.06)';
-  for (let x = 0; x <= W; x += TILE * 2) { b.beginPath(); b.moveTo(x + .5, 0); b.lineTo(x + .5, H); b.stroke(); }
-  for (let y = 0; y <= H; y += TILE * 2) { b.beginPath(); b.moveTo(0, y + .5); b.lineTo(W, y + .5); b.stroke(); }
-  // pits
+  // ---- pits
   for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
     if (grid[cy * COLS + cx] !== 3) continue;
-    const x = cx * TILE, y = cy * TILE;
-    const g = b.createRadialGradient(x + 20, y + 21, 2, x + 20, y + 20, 19);
-    g.addColorStop(0, '#000'); g.addColorStop(0.8, '#050506'); g.addColorStop(1, '#2a2a30');
-    b.fillStyle = g; b.beginPath(); b.arc(x + 20, y + 20, 17, 0, TAU); b.fill();
-    b.strokeStyle = 'rgba(52,211,153,.18)'; b.lineWidth = 1.2; b.beginPath(); b.arc(x + 20, y + 20, 17, 0, TAU); b.stroke();
+    const x = cx * TILE, y = cy * TILE, g = b.createRadialGradient(x + 20, y + 21, 2, x + 20, y + 20, 19);
+    if (th.pit === 'lava') { g.addColorStop(0, '#fde047'); g.addColorStop(0.45, '#f97316'); g.addColorStop(1, '#7c2d12'); b.shadowColor = '#f97316'; b.shadowBlur = 14; }
+    else if (th.pit === 'water') { g.addColorStop(0, '#0b2a44'); g.addColorStop(0.7, '#082035'); g.addColorStop(1, '#2b6c8f'); }
+    else { g.addColorStop(0, '#000'); g.addColorStop(0.8, '#050506'); g.addColorStop(1, '#2a2a30'); }
+    b.fillStyle = g; b.beginPath(); b.arc(x + 20, y + 20, 17, 0, TAU); b.fill(); b.shadowBlur = 0;
+    b.strokeStyle = th.edge; b.lineWidth = 1.2; b.beginPath(); b.arc(x + 20, y + 20, 17, 0, TAU); b.stroke();
+    if (th.pit === 'water') { b.strokeStyle = 'rgba(160,220,255,.18)'; b.beginPath(); b.arc(x + 20, y + 20, 9, 0.3, 2.2); b.stroke(); }
   }
-  // wall shadows
-  b.fillStyle = 'rgba(0,0,0,.55)';
-  for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
-    const t = grid[cy * COLS + cx]; if (t === 1 || t === 2) b.fillRect(cx * TILE + 5, cy * TILE + 6, TILE, TILE);
-  }
-  // walls: steel blocks; breakables: cracked concrete
+  // ---- wall shadows
+  b.fillStyle = th.glow ? 'rgba(0,0,0,.35)' : 'rgba(0,0,0,.55)';
+  for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) { const t = grid[cy * COLS + cx]; if (t === 1 || t === 2) b.fillRect(cx * TILE + 5, cy * TILE + 6, TILE, TILE); }
+  // ---- walls
+  const solid = (cx, cy) => cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS && grid[cy * COLS + cx] === 1;
   for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
     const t = grid[cy * COLS + cx]; if (t !== 1 && t !== 2) continue;
     const x = cx * TILE, y = cy * TILE;
     if (t === 1) {
-      b.fillStyle = '#2e2e35'; b.fillRect(x, y, TILE, TILE);
-      const g = b.createLinearGradient(x, y, x + TILE, y + TILE);
-      g.addColorStop(0, '#4a4a53'); g.addColorStop(1, '#33333a');
+      const [base, hi, lo] = th.wall, st = th.wallStyle;
+      b.fillStyle = base; b.fillRect(x, y, TILE, TILE);
+      const g = b.createLinearGradient(x, y, x + TILE, y + TILE); g.addColorStop(0, hi); g.addColorStop(1, lo);
       b.fillStyle = g; b.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-      b.fillStyle = 'rgba(255,255,255,.12)'; b.fillRect(x + 2, y + 2, TILE - 4, 1.5); b.fillRect(x + 2, y + 2, 1.5, TILE - 4);
-      b.fillStyle = 'rgba(0,0,0,.35)'; b.fillRect(x + 2, y + TILE - 3.5, TILE - 4, 1.5); b.fillRect(x + TILE - 3.5, y + 2, 1.5, TILE - 4);
-      b.fillStyle = 'rgba(0,0,0,.45)';
-      for (const [px, py] of [[7, 7], [TILE - 7, 7], [7, TILE - 7], [TILE - 7, TILE - 7]]) { b.beginPath(); b.arc(x + px, y + py, 1.6, 0, TAU); b.fill(); }
+      if (st === 'record') {
+        b.fillStyle = '#050505'; b.beginPath(); b.arc(x + 20, y + 20, 17, 0, TAU); b.fill();
+        b.strokeStyle = 'rgba(255,255,255,.07)'; b.lineWidth = 0.8; for (let r = 7; r < 17; r += 2.5) { b.beginPath(); b.arc(x + 20, y + 20, r, 0, TAU); b.stroke(); }
+        b.fillStyle = (cx + cy) % 3 === 0 ? '#bef264' : (cx + cy) % 3 === 1 ? '#34d399' : '#f87171'; b.beginPath(); b.arc(x + 20, y + 20, 5, 0, TAU); b.fill();
+        b.fillStyle = '#050505'; b.beginPath(); b.arc(x + 20, y + 20, 1.2, 0, TAU); b.fill();
+        b.fillStyle = 'rgba(255,255,255,.08)'; b.beginPath(); b.arc(x + 20, y + 20, 16, -2.4, -1.6); b.lineTo(x + 20, y + 20); b.fill();
+      } else if (st === 'barrier') {
+        b.fillStyle = 'rgba(0,0,0,.18)'; b.fillRect(x + 2, y + 26, TILE - 4, 12);
+        b.fillStyle = '#f97316'; b.fillRect(x + 2, y + 9, TILE - 4, 4); b.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 0; i < TILE - 4; i += 10) b.fillRect(x + 2 + i, y + 9, 5, 4);
+      } else if (st === 'tile') {
+        b.strokeStyle = 'rgba(180,240,255,.18)'; b.lineWidth = 1; b.strokeRect(x + 2.5, y + 2.5, 17, 17); b.strokeRect(x + 20.5, y + 2.5, 17, 17); b.strokeRect(x + 2.5, y + 20.5, 17, 17); b.strokeRect(x + 20.5, y + 20.5, 17, 17);
+      } else if (st === 'neon') {
+        b.shadowColor = th.glow; b.shadowBlur = 10; b.strokeStyle = th.glow; b.lineWidth = 1.6;
+        b.beginPath();
+        if (!solid(cx, cy - 1)) { b.moveTo(x + 1, y + 1.5); b.lineTo(x + TILE - 1, y + 1.5); }
+        if (!solid(cx, cy + 1)) { b.moveTo(x + 1, y + TILE - 1.5); b.lineTo(x + TILE - 1, y + TILE - 1.5); }
+        if (!solid(cx - 1, cy)) { b.moveTo(x + 1.5, y + 1); b.lineTo(x + 1.5, y + TILE - 1); }
+        if (!solid(cx + 1, cy)) { b.moveTo(x + TILE - 1.5, y + 1); b.lineTo(x + TILE - 1.5, y + TILE - 1); }
+        b.stroke(); b.shadowBlur = 0;
+      } else if (st === 'sandstone') {
+        b.fillStyle = 'rgba(60,40,15,.25)'; for (let i = 8; i < TILE; i += 9) b.fillRect(x + 2, y + i, TILE - 4, 2);
+      } else if (st === 'ice') {
+        b.fillStyle = 'rgba(255,255,255,.22)'; b.beginPath(); b.moveTo(x + 4, y + 30); b.lineTo(x + 14, y + 4); b.lineTo(x + 19, y + 4); b.lineTo(x + 9, y + 30); b.fill();
+        if (!solid(cx, cy - 1)) { b.fillStyle = '#eef6fb'; b.fillRect(x + 1, y, TILE - 2, 6); b.beginPath(); b.arc(x + 10, y + 6, 3, 0, Math.PI); b.arc(x + 28, y + 6, 4, 0, Math.PI); b.fill(); }
+      } else if (st === 'moss') {
+        let s2 = cx * 13 + cy * 7; const r2 = () => (s2 = (s2 * 9301 + 49297) % 233280) / 233280;
+        for (let i = 0; i < 5; i++) { b.fillStyle = `rgba(${70 + r2() * 50},${130 + r2() * 60},50,.55)`; b.beginPath(); b.arc(x + 4 + r2() * 32, y + 4 + r2() * (solid(cx, cy - 1) ? 32 : 12), 3 + r2() * 5, 0, TAU); b.fill(); }
+      } else if (st === 'basalt') {
+        b.strokeStyle = 'rgba(251,146,60,.8)'; b.lineWidth = 1.6; b.shadowColor = '#f97316'; b.shadowBlur = 6;
+        b.beginPath(); b.moveTo(x + 6, y + 30); b.lineTo(x + 16, y + 22); b.lineTo(x + 22, y + 27); b.lineTo(x + 33, y + 14); b.stroke(); b.shadowBlur = 0;
+      } else if (st === 'gold') {
+        b.strokeStyle = '#d4af37'; b.lineWidth = 1.5; b.strokeRect(x + 4.5, y + 4.5, TILE - 9, TILE - 9);
+        b.fillStyle = 'rgba(212,175,55,.85)'; b.beginPath(); b.moveTo(x + 20, y + 13); b.lineTo(x + 27, y + 20); b.lineTo(x + 20, y + 27); b.lineTo(x + 13, y + 20); b.fill();
+      }
+      if (st !== 'record' && st !== 'neon') {
+        b.fillStyle = 'rgba(255,255,255,.12)'; b.fillRect(x + 2, y + 2, TILE - 4, 1.5); b.fillRect(x + 2, y + 2, 1.5, TILE - 4);
+        b.fillStyle = 'rgba(0,0,0,.35)'; b.fillRect(x + 2, y + TILE - 3.5, TILE - 4, 1.5); b.fillRect(x + TILE - 3.5, y + 2, 1.5, TILE - 4);
+      }
+      if (!st) { b.fillStyle = 'rgba(0,0,0,.45)'; for (const [px, py] of [[7, 7], [TILE - 7, 7], [7, TILE - 7], [TILE - 7, TILE - 7]]) { b.beginPath(); b.arc(x + px, y + py, 1.6, 0, TAU); b.fill(); } }
     } else {
-      b.fillStyle = '#58534d'; b.fillRect(x, y, TILE, TILE);
-      b.fillStyle = '#6f6962'; b.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+      b.fillStyle = th.cork[0]; b.fillRect(x, y, TILE, TILE);
+      b.fillStyle = th.cork[1]; b.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
       let s2 = cx * 31 + cy * 17 + 7; const r2 = () => (s2 = (s2 * 9301 + 49297) % 233280) / 233280;
       b.strokeStyle = 'rgba(20,18,16,.55)'; b.lineWidth = 1;
       for (let i = 0; i < 3; i++) {
