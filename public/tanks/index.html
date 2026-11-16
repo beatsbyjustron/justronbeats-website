@@ -33,6 +33,9 @@
   #stage{position:relative}
   canvas{display:block;border-radius:14px;border:1px solid var(--line);box-shadow:0 0 0 1px #000,0 20px 60px rgba(52,211,153,.07),0 20px 60px rgba(0,0,0,.8);cursor:none;touch-action:none}
   #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:14px;pointer-events:none}
+  #tlm{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:12px}
+  #tlm a{color:var(--accent,#bef264);text-decoration:none}
+  #tlm a:hover{text-decoration:underline}
   .panel{pointer-events:auto;cursor:default;background:rgba(9,9,11,.94);border:1px solid var(--line);border-radius:20px;padding:30px 38px;text-align:center;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.7);backdrop-filter:blur(6px)}
   .panel h1{margin:0 0 2px;font-size:46px;font-weight:800;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   .panel h2{margin:0 0 10px;font-size:28px;font-weight:800;letter-spacing:.05em;color:var(--txt)}
@@ -984,6 +987,7 @@ function unlockWorld(i) {
 function newMission() {
   if (net.role !== 'guest') pickMissionBeat();
   loadBeat(curBeat()); loadBeat(upcomingBeat());
+  logTrack();
   levelAlive = lvl().e.map(() => true);
   missionKills = {}; missionDeaths = 0; lastStars = null;
   startAttempt(true);
@@ -1358,6 +1362,7 @@ function startGame(from = 0) {
   challenge = null;
   mission = Math.max(0, Math.min(LEVELS.length - 1, from)); lives = 3; score = 0; kills = 0;
   runStart = mission; postState = 'idle'; boardRank = null;
+  resetTracklist();
   track('tanks_game_start', { from_mission: mission + 1 });
   music.resetBeat();
   newMission();
@@ -1383,6 +1388,85 @@ function beatCard(label) {
   const w = curBeat();
   return `<div class="card">${label || 'World ' + (worldOf(mission) + 1) + ' soundtrack'}<div class="bn">♪ ${esc(w.beat)}</div><div class="small" style="margin:-6px 0 8px">${esc(w.prod || BRAND.tag)}</div>
     <a class="lic" href="${esc(w.link)}" target="_blank" rel="noopener">License this beat · ${esc(BRAND.leasePrice)} lease</a>${w.uuid ? '<div><button class="btn2" data-act="savebeat">♥ Save to my account</button></div>' : ''}</div>`;
+}
+// ---- tracklist: every beat that played this run, in mission order, saved in the browser
+let tracklist = { at: '', items: [] }, sharedList = null, tracksReturn = 'title';
+try { const t = JSON.parse(localStorage.getItem('jt_tracklist') || 'null'); if (t && Array.isArray(t.items)) tracklist = t; } catch (e) {}
+function saveTracklist() { try { localStorage.setItem('jt_tracklist', JSON.stringify(tracklist)); } catch (e) {} }
+function resetTracklist() { tracklist = { at: new Date().toISOString(), items: [] }; saveTracklist(); }
+function logTrack() {
+  if (challenge || customBeat) return;
+  const b = curBeat(); if (!b || !b.beat) return;
+  const last = tracklist.items[tracklist.items.length - 1];
+  if (last && mission <= last.m) { if (mission === last.m) return; resetTracklist(); } // a new run started
+  tracklist.items.push({ m: mission, id: b.uuid || '', beat: b.beat, prod: b.prod || '', link: b.link || '' });
+  saveTracklist();
+}
+const tlShareUrl = list => BRAND.store.replace(/\/$/, '') + '/tanks?tl=' + list.filter(t => t.id).map(t => t.m + 1 + '-' + t.id.replace(/-/g, '')).join('.');
+function readSharedList() {
+  let q = null; try { q = new URLSearchParams(location.search).get('tl'); } catch (e) {}
+  if (!q || !catalog) return null;
+  const byHex = {}; for (const b of catalog) byHex[String(b.uuid).replace(/-/g, '')] = b;
+  const items = q.split('.').slice(0, 100).map(part => { const [mm, hex] = part.split('-'); const b = byHex[hex]; return b && +mm > 0 ? { m: +mm - 1, id: b.uuid, beat: b.beat, prod: b.prod, link: b.link } : null; }).filter(Boolean);
+  return items.length ? items : null;
+}
+function saveBeatById(id) {
+  const b = (catalog || []).find(x => x.uuid === id); if (!b) return;
+  const s = storeSession();
+  track('tanks_beat_save_click', { signed_in: !!s, from: 'tracklist' });
+  if (!s) { toast('Sign in at ' + BRAND.store.replace(/^https?:\/\//, '') + '/account to save beats'); return; }
+  fetch('/api/account/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.access_token }, body: JSON.stringify({ beatId: b.uuid, saved: true }) })
+    .then(r => toast(r.ok ? '♥ Saved "' + b.beat + '" to your account' : "Couldn't save that beat right now"))
+    .catch(() => toast("Couldn't save that beat right now"));
+}
+function tracksPanel() {
+  const shared = !!sharedList, list = shared ? sharedList : tracklist.items;
+  const rows = list.length ? list.map(t => {
+    const wi = Math.min(THEMES.length - 1, Math.floor(t.m / 5));
+    return `<tr><td class="small" style="white-space:nowrap;padding:7px 8px 7px 0">M${t.m + 1}<div style="opacity:.6">${esc(THEMES[wi].name)}</div></td>
+      <td style="text-align:left;padding:7px 6px"><b>${esc(t.beat)}</b><div class="small" style="opacity:.7">${esc(t.prod)}</div></td>
+      <td style="white-space:nowrap;text-align:right;padding:7px 0">${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener" data-tl="listen">Listen</a> · <a href="${esc(t.link)}" target="_blank" rel="noopener" data-tl="license">License</a>` : ''}${t.id && catalog ? ` · <a href="#" data-tlsave="${esc(t.id)}">♥</a>` : ''}</td></tr>`;
+  }).join('') : '<tr><td class="small" style="padding:16px">Play a mission and every beat you hear lands here.</td></tr>';
+  return `<div class="panel" style="min-width:min(560px,92vw)">
+    <h2>${shared ? 'SHARED TRACKLIST' : 'YOUR TRACKLIST'}</h2>
+    <p class="small">${shared ? 'Someone played Justron Tanks to these beats. Run it yourself and get your own mix.' : 'Every beat from your ' + (['intro', 'play', 'paused', 'cleared', 'dead', 'world'].includes(state) ? 'current' : 'last') + ' run, in order. Hear one you liked? Tap Listen.'}</p>
+    <div style="max-height:min(46vh,380px);overflow:auto;margin:8px 0;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table></div>
+    <div class="row">${shared ? '<button class="btn" data-act="start">Play Justron Tanks</button>' : list.some(t => t.id) ? '<button class="btn2" data-act="tlshare">Share my tracklist</button>' : ''}<button class="btn2" data-act="tlback">Back</button></div>
+  </div>`;
+}
+function openTracks(shared) {
+  sharedList = shared || null;
+  let m = document.getElementById('tlm');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'tlm';
+    m.addEventListener('click', e => {
+      if (e.target === m) { closeTracks(); return; }
+      const sv = e.target.closest && e.target.closest('[data-tlsave]');
+      if (sv) { e.preventDefault(); saveBeatById(sv.dataset.tlsave); return; }
+      const ln = e.target.closest && e.target.closest('[data-tl]');
+      if (ln) { track('tanks_tracklist_click', { action: ln.dataset.tl }); return; }
+      const b = e.target.closest && e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.dataset.act === 'tlback') closeTracks();
+      if (b.dataset.act === 'start') { closeTracks(); if (state === 'title') startGame(); }
+      if (b.dataset.act === 'tlshare') shareTracks(b);
+    });
+    document.body.appendChild(m);
+  }
+  m.innerHTML = tracksPanel(); m.style.display = 'flex';
+  track('tanks_tracklist_open', { shared: !!shared, beats: (shared || tracklist.items).length });
+}
+function closeTracks() { const m = document.getElementById('tlm'); if (m) m.style.display = 'none'; if (sharedList) { sharedList = null; try { history.replaceState(null, '', location.pathname); } catch (e) {} } }
+function shareTracks(btn) {
+  const url = tlShareUrl(tracklist.items), n = tracklist.items.length;
+  const text = `My Justron Tanks tracklist: ${n} beat${n === 1 ? '' : 's'} from my run.`;
+  track('tanks_tracklist_share', { beats: n });
+  const copied = () => { btn.textContent = 'Link copied!'; setTimeout(() => { btn.textContent = 'Share my tracklist'; }, 2200); };
+  try {
+    if (navigator.share) { navigator.share({ title: 'Justron Tanks tracklist', text, url }).catch(() => {}); return; }
+    navigator.clipboard.writeText(url).then(copied, () => toast(url));
+  } catch (e) { toast(url); }
 }
 function codesList() {
   const real = unlocked.filter(i => WORLDS[i] && WORLDS[i].code);
@@ -1414,7 +1498,7 @@ function renderOverlay() {
       ${best ? `<p class="small">Best: reached mission ${best}${totalStars() ? ` · <span style="color:#fde047">★ ${totalStars()}/${LEVELS.length * 3}</span> stars this week` : ''}</p>` : ''}
       <div class="row"><button class="btn" data-act="start">Start</button>${best > 1 ? `<button class="btn" data-act="continue">Continue · M${Math.min(best, LEVELS.length)}</button>` : ''}</div>
       ${net.role !== 'guest' && !net.connected ? `<div class="row"><button class="btn2" data-act="challenge" style="border-color:#fde047;color:#fde047">Weekly challenge · ${esc(weekly().info.name)}</button></div>` : ''}
-      ${net.avail || boardAvail ? `<div class="row">${net.avail ? '<button class="btn2" data-act="duo">Play duos · invite a friend</button>' : ''}${boardAvail ? '<button class="btn2" data-act="board">Leaderboard</button>' : ''}</div>` : ''}
+      <div class="row">${net.avail ? '<button class="btn2" data-act="duo">Play duos · invite a friend</button>' : ''}${boardAvail ? '<button class="btn2" data-act="board">Leaderboard</button>' : ''}${tracklist.items.length ? `<button class="btn2" data-act="tracks">♪ Your tracklist (${tracklist.items.length})</button>` : ''}</div>
       ${codesList()}
       ${ALLOW_OWN_BEAT ? beatSection() : ''}
     </div>`;
@@ -1458,6 +1542,7 @@ function renderOverlay() {
     html = `<div class="panel"><h2>PAUSED</h2>
       <div class="row"><button class="btn" data-act="resume">Resume</button></div>
       <div class="row"><button class="btn2" data-act="restart">Restart mission</button><button class="btn2" data-act="quit">Quit to title</button></div>
+      <div class="row">${tracklist.items.length ? `<button class="btn2" data-act="tracks">♪ Your tracklist (${tracklist.items.length})</button>` : ''}</div>
       ${beatCard()}
       ${ALLOW_OWN_BEAT ? beatSection() : ''}
     </div>`;
@@ -1476,7 +1561,7 @@ function renderOverlay() {
       ${codesList()}
       ${signupBox()}
       ${leaderboardBox()}
-      <div class="row"><button class="btn2" data-act="share">Share my score</button></div>
+      <div class="row"><button class="btn2" data-act="share">Share my score</button>${tracklist.items.length ? `<button class="btn2" data-act="tracks">♪ Your tracklist (${tracklist.items.length})</button>` : ''}</div>
       <button class="btn" data-act="start">Play again</button>
     </div>`;
   } else if (state === 'world') {
@@ -1556,6 +1641,7 @@ overlay.addEventListener('click', e => {
   if (act === 'join') joinDuo();
   if (act === 'savebeat') saveCurrentBeat();
   if (act === 'share') shareScore(b);
+  if (act === 'tracks') { openTracks(); return; }
   if (net.role === 'guest') return;
   if (act === 'board') { boardReturn = state === 'board' ? boardReturn : state; loadBoard().then(() => setState('board')); return; }
   if (act === 'back') { setState(boardReturn || 'title'); return; }
@@ -1825,7 +1911,7 @@ function update(dt) {
   net.tick(dt);
   if (net.role === 'guest') { updateGuest(dt); return; }
 
-  if (['title', 'over', 'win', 'paused', 'world', 'lobby', 'join', 'joining', 'lost', 'board', 'chdone', 'chboard'].includes(state)) return;
+  if (['title', 'over', 'win', 'paused', 'world', 'lobby', 'join', 'joining', 'lost', 'board', 'chdone', 'chboard', 'tracks'].includes(state)) return;
 
   if (state === 'intro') { if (stateT > 2.6) setState('play'); return; }
 
@@ -2728,7 +2814,7 @@ function applySnap(m) {
   const bt = m.bt || null;
   if (bt !== (missionBeat ? missionBeat.id : null)) {
     missionBeat = bt && catalog ? catalog.find(b => b.id === bt) || null : null;
-    loadBeat(curBeat()); updateNowPlaying();
+    loadBeat(curBeat()); updateNowPlaying(); logTrack();
   }
   lives = m.l; score = m.sc; kills = m.k; levelAlive = m.la.map(Boolean);
   if (m.grid) { grid = Uint8Array.from(m.grid, c => +c); gridV = m.g; drawBg(); }
@@ -2997,7 +3083,7 @@ window.addEventListener('pageshow', e => { if (e.persisted) splash.classList.add
 setMute(muted); setMusic(musicOn); musicReady = true;
 try { inviteCode = (new URLSearchParams(location.search).get('duo') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); } catch (e) {}
 setState('title');
-loadCatalog().then(() => { if (state === 'title') renderOverlay(); });
+loadCatalog().then(() => { if (state === 'title') renderOverlay(); const sh = readSharedList(); if (sh) openTracks(sh); });
 loadBoard().then(() => { if (state === 'title') renderOverlay(); });
 loadChBoard();
 net.checkAvailable().then(ok => {
