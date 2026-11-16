@@ -53,6 +53,20 @@
   .banner:before{content:"";position:absolute;left:0;right:0;top:-1px;height:2px;background:var(--grad)}
   .banner h2{margin:0;font-size:34px;font-weight:800;letter-spacing:.08em;color:var(--txt)}
   .banner p{margin:6px 0 0;color:#d4d4d8}
+  .koflash{position:absolute;inset:0;border-radius:14px;pointer-events:none;background:radial-gradient(ellipse at center,rgba(239,68,68,0) 35%,rgba(239,68,68,.35) 100%);animation:koFlash 1.4s ease-out forwards}
+  @keyframes koFlash{0%{background-color:rgba(239,68,68,.35)}15%{background-color:rgba(239,68,68,0)}100%{opacity:.55}}
+  .banner.ko{background:linear-gradient(90deg,rgba(40,4,8,0),rgba(40,4,8,.94) 18%,rgba(40,4,8,.94) 82%,rgba(40,4,8,0));border:0;padding:20px 0 18px;overflow:hidden;animation:koIn .5s cubic-bezier(.2,1.5,.4,1) both}
+  .banner.ko:before,.banner.ko:after{content:"";position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ef4444 30%,#f97316 50%,#ef4444 70%,transparent)}
+  .banner.ko:before{top:0}.banner.ko:after{bottom:0}
+  .banner.ko .tag{font-size:11px;letter-spacing:.5em;color:#fca5a5;font-weight:700;opacity:.9}
+  .banner.ko h2{font-size:clamp(30px,6vw,58px);letter-spacing:.12em;font-weight:900;color:#fff;margin:4px 0 2px;text-shadow:0 0 22px rgba(239,68,68,.85),3px 0 0 rgba(239,68,68,.75),-3px 0 0 rgba(56,189,248,.55);animation:koGlitch 2.4s steps(1) infinite .5s}
+  .banner.ko .scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 4px)}
+  .banner.ko .hearts2{font-size:24px;letter-spacing:8px;margin-top:6px;color:#ef4444;text-shadow:0 0 12px rgba(239,68,68,.6)}
+  .banner.ko .hearts2 .lost{color:#3f3f46;text-shadow:none;display:inline-block;animation:koHeart .9s ease-out both .25s}
+  .banner.ko p{color:#fecaca;letter-spacing:.06em}
+  @keyframes koIn{0%{transform:scaleY(0) scaleX(1.3);opacity:0}60%{opacity:1}100%{transform:none;opacity:1}}
+  @keyframes koGlitch{0%,86%,100%{transform:none;clip-path:none}88%{transform:translate(-4px,1px) skewX(-10deg)}90%{transform:translate(4px,-1px);clip-path:inset(20% 0 40% 0)}92%{transform:translate(-2px,0);clip-path:inset(60% 0 5% 0)}94%{transform:none;clip-path:none}}
+  @keyframes koHeart{0%{color:#ef4444;transform:scale(1.4)}40%{transform:scale(.7) rotate(-15deg)}100%{color:#3f3f46;transform:none}}
   .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
   .chip{display:flex;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);padding:4px 11px;border-radius:999px;font-size:13px}
   .chip i{width:12px;height:12px;border-radius:4px;display:inline-block;border:1px solid rgba(255,255,255,.25)}
@@ -69,9 +83,36 @@
   .signup{display:flex;gap:6px;justify-content:center;margin-top:12px}
   .signup input{background:#000;border:1px solid var(--line2);border-radius:999px;color:var(--txt);padding:8px 14px;font:inherit;font-size:13px;width:210px;outline:none}
   .signup input:focus{border-color:var(--em)}
-  #np{position:absolute;left:10px;bottom:10px;background:rgba(9,9,11,.85);border:1px solid var(--line2);border-radius:999px;padding:5px 12px;font-size:12px;color:var(--muted);display:none;pointer-events:auto;cursor:default;max-width:70%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #np{position:absolute;left:10px;bottom:10px;box-sizing:border-box;background:linear-gradient(135deg,rgba(18,18,22,.94),rgba(9,9,11,.94));border:1px solid var(--line2);border-radius:999px;padding:5px 14px 5px 6px;font-size:12px;color:var(--muted);display:none;pointer-events:auto;cursor:default;max-width:70%;white-space:nowrap;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+  #np .npw{display:flex;align-items:center;gap:10px}
+  #np .rec{flex:none;width:26px;height:26px;border-radius:50%;position:relative;background:repeating-radial-gradient(circle,#151518 0 1.5px,#0a0a0c 1.5px 3px);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 2px 8px rgba(0,0,0,.6)}
+  #np .rec:before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 40deg,rgba(255,255,255,.14) 60deg,transparent 80deg 220deg,rgba(255,255,255,.08) 240deg,transparent 260deg)}
+  #np .rec:after{content:"";position:absolute;left:32%;top:32%;width:36%;height:36%;border-radius:50%;background:radial-gradient(circle,#0a0a0c 0 14%,transparent 16%),var(--grad,linear-gradient(135deg,#34d399,#bef264))}
+  #np .rec.spin{animation:npSpin 2.2s linear infinite}
+  @keyframes npSpin{to{transform:rotate(360deg)}}
+  #np .npt{min-width:0;overflow:hidden}
+  #np .lbl{font-size:9px;letter-spacing:.28em;color:var(--em,#34d399);font-weight:700;display:flex;align-items:center;gap:6px}
+  #np .eq{display:inline-flex;align-items:flex-end;gap:2px;height:9px}
+  #np .eq i{width:2px;height:3px;background:var(--em,#34d399);border-radius:1px}
+  #np .eq.on i{animation:npEq .9s ease-in-out infinite}
+  #np .eq.on i:nth-child(2){animation-delay:-.3s}#np .eq.on i:nth-child(3){animation-delay:-.55s}#np .eq.on i:nth-child(4){animation-delay:-.15s}
+  @keyframes npEq{0%,100%{height:2px}50%{height:9px}}
+  #np .ttl{color:var(--txt);font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+  #np .pr{font-size:11px;overflow:hidden;text-overflow:ellipsis}
+  #np:not(.side) .lbl{display:none}
+  #np:not(.side) .ttl,#np:not(.side) .pr{display:inline}
+  #np:not(.side) .ttl:after{content:" · ";color:var(--muted);font-weight:400}
+  body.npside #np{position:absolute;top:50%;bottom:auto;left:calc(100% + 18px);transform:translateY(-50%);width:210px;max-width:none;border-radius:20px;padding:18px 16px;white-space:normal;text-align:center}
+  body.npside #np .npw{flex-direction:column;gap:12px}
+  body.npside #np .rec{width:118px;height:118px;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 30px rgba(0,0,0,.7),0 0 40px rgba(52,211,153,.12)}
+  body.npside #np .ttl{font-size:16px;white-space:normal;line-height:1.25;margin-top:4px}
+  body.npside #np .pr{white-space:normal;line-height:1.6;margin-top:4px}
+  body.npside #np .lbl{justify-content:center}
+  body.npside #np .links{display:flex;gap:6px;justify-content:center;margin-top:10px}
+  body.npside #np .links a{border:1px solid var(--line2);border-radius:999px;padding:5px 10px;font-size:11px}
   #np b{color:var(--txt)}
-  body:not(.touch) #np{top:calc(100% + 7px);bottom:auto;left:50%;transform:translateX(-50%);max-width:100%}
+  body:not(.touch):not(.npside) #np{top:calc(100% + 7px);bottom:auto;left:50%;transform:translateX(-50%);max-width:100%;padding:3px 14px 3px 4px}
+  body:not(.touch):not(.npside) #np .rec{width:22px;height:22px}
   #toast{position:absolute;top:12px;left:50%;transform:translateX(-50%) translateY(-6px);background:rgba(9,9,11,.92);border:1px solid var(--line2);border-radius:999px;padding:7px 16px;font-size:13px;color:var(--txt);opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .link{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#000;border:1px solid var(--line2);border-radius:12px;padding:10px 14px;margin:10px auto 4px;max-width:420px;word-break:break-all;color:var(--txt);user-select:all;-webkit-user-select:all}
@@ -106,7 +147,8 @@
   body.touch.rails #hud span b{font-size:13px}
   body.touch.rails #hud .hearts{font-size:12px}
   body.touch.rails #np{position:fixed;box-sizing:border-box;left:auto;bottom:auto;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 10px);width:calc(var(--rail) - 20px);max-width:none;white-space:normal;border-radius:14px;font-size:11px;line-height:1.45;padding:8px 10px;z-index:30}
-  @media (max-height:300px){body.touch.rails #np{font-size:10px;line-height:1.35;padding:6px 8px;top:calc(env(safe-area-inset-top) + 6px)}body.touch.rails #touch #mineBtn{bottom:calc(env(safe-area-inset-bottom) + var(--stick) + 30px)}}
+  body.touch.rails #np .npw{flex-direction:row;align-items:center;gap:8px}body.touch.rails #np .rec{width:30px;height:30px}body.touch.rails #np .ttl,body.touch.rails #np .pr{display:block;white-space:normal}body.touch.rails #np .ttl:after{content:none}
+  @media (max-height:300px){body.touch.rails #np .rec{width:24px;height:24px}body.touch.rails #np{font-size:10px;line-height:1.35;padding:6px 8px;top:calc(env(safe-area-inset-top) + 6px)}body.touch.rails #touch #mineBtn{bottom:calc(env(safe-area-inset-bottom) + var(--stick) + 30px)}}
 body.touch.rails #touch .stick{width:var(--stick);height:var(--stick)}
   body.touch.rails #touch #stickL{left:calc(env(safe-area-inset-left) + max(8px, (var(--rail) - var(--stick)) / 2))}
   body.touch.rails #touch #stickR{right:calc(env(safe-area-inset-right) + max(8px, (var(--rail) - var(--stick)) / 2))}
@@ -546,7 +588,7 @@ function fit() {
     wrapEl.style.width = vw + 'px'; wrapEl.style.height = vh + 'px';
     wrapEl.style.right = 'auto'; wrapEl.style.bottom = 'auto';
   }
-  const maxW = vw - (touchMode ? 4 : 24), maxH = vh - (touchMode ? 4 : 30 + 8 + 24 + 46);
+  const maxW = vw - (touchMode ? 4 : 24), maxH = vh - (touchMode ? 4 : 30 + 8 + 24 + 54);
   const s = Math.max(0.3, Math.min(maxW / VW, maxH / VH));
   const cw = Math.floor(VW * s), ch = Math.floor(VH * s);
   canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
@@ -554,6 +596,7 @@ function fit() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
   scale = canvas.width / VW;
+  if (document.body && document.body.classList) { document.body.classList.toggle('npside', !touchMode && (vw - cw) / 2 >= 250); try { if (hud.np) updateNowPlaying(); } catch (e) {} }
   // phones: use the empty space beside the arena for the HUD and now-playing card
   if (document.documentElement && document.documentElement.style && document.body && document.body.classList) {
     const rail = Math.max(0, (vw - cw) / 2);
@@ -846,7 +889,7 @@ const music = (() => {
 })();
 
 function setMute(m) {
-  muted = m;
+  muted = m; setTimeout(updateNowPlaying, 0);
   hud.mute.innerHTML = muted ? SPK_OFF : SPK_ON;
   if (hud.mute.classList) hud.mute.classList.toggle('off', muted);
   if (hud.mute.setAttribute) hud.mute.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
@@ -863,7 +906,7 @@ function setVolume(v) {
 function setMusic(on) {
   musicOn = on; hud.music.textContent = musicOn ? 'Music on' : 'Music off';
   try { localStorage.setItem('rt_music', musicOn ? '1' : '0'); } catch (e) {}
-  syncMusic();
+  syncMusic(); updateNowPlaying();
 }
 // Only one tab plays at a time, and a loaded beat keeps rolling between missions.
 const TAB_ID = Math.random().toString(36).slice(2);
@@ -1010,12 +1053,24 @@ function saveCurrentBeat() {
     .catch(() => toast("Couldn't save that beat right now"));
 }
 function updateNowPlaying() {
-  const show = ['intro', 'play', 'cleared', 'dead', 'paused'].includes(state);
+  // always on screen when there's room beside or under the arena; on small phones only during missions
+  const bc = document.body && document.body.classList, roomy = !bc || !bc.contains('touch') || bc.contains('rails');
+  const show = roomy ? !['join', 'joining'].includes(state) : ['intro', 'play', 'cleared', 'dead', 'paused'].includes(state);
   if (!show) { hud.np.style.display = 'none'; return; }
-  const w = curBeat(), on = !!(customBeat || beatBuf());
-  const name = customBeat ? customName : w.beat;
+  const w = curBeat(), loaded = !!(customBeat || beatBuf()), on = loaded && musicOn && !muted;
+  const name = customBeat ? customName : w.beat, side = !!(document.body && document.body.classList && document.body.classList.contains('npside'));
+  const links = customBeat ? '' : `${w.uuid ? '<a href="#" data-np="save">♥ Save</a>' : ''}${w.uuid ? (side ? '' : ' · ') : ''}<a href="${esc(w.link)}" target="_blank" rel="noopener">License</a>`;
+  const label = !loaded ? 'LOADING' : on ? 'NOW PLAYING' : 'MUSIC OFF';
+  const key = [name, label, side, links].join('|');
   hud.np.style.display = 'block';
-  hud.np.innerHTML = `♪ ${on ? 'Now playing' : 'Loading'}: <b>${esc(name)}</b> · ${esc(customBeat ? BRAND.tag : (w.prod || BRAND.tag))}${customBeat ? '' : `${w.uuid ? ' · <a href="#" data-np="save">♥ Save</a>' : ''} · <a href="${esc(w.link)}" target="_blank" rel="noopener">License</a>`}`;
+  hud.np.classList.toggle('side', side);
+  if (hud.np._k === key) return;
+  hud.np._k = key;
+  hud.np.innerHTML = `<div class="npw"><div class="rec${on ? ' spin' : ''}"></div><div class="npt">
+    <div class="lbl">${label}<span class="eq${on ? ' on' : ''}"><i></i><i></i><i></i><i></i></span></div>
+    <div class="ttl">${side ? '' : (on ? '♪ ' : '')}${esc(name)}</div>
+    <div class="pr">${esc(customBeat ? BRAND.tag : (w.prod || BRAND.tag))}${side ? '' : (links ? ' · ' + links : '')}</div>
+    ${side && links ? `<div class="links">${links}</div>` : ''}</div></div>`;
 }
 let unlocked = [];
 try { unlocked = JSON.parse(localStorage.getItem('jt_codes') || '[]'); } catch (e) { unlocked = []; }
@@ -1588,7 +1643,12 @@ function renderOverlay() {
   } else if (state === 'cleared') {
     html = challenge ? `<div class="banner"><h2>CHALLENGE CLEARED</h2><p>${fmtTime(missionTime)}</p></div>` : `<div class="banner"><h2>MISSION CLEARED</h2>${starsBanner()}</div>`;
   } else if (state === 'dead') {
-    html = `<div class="banner"><h2>${net.connected ? 'BOTH TANKS DOWN' : 'TANK DESTROYED'}</h2><p>${lives - 1 > 0 ? `${lives - 1} ${lives - 1 === 1 ? 'life' : 'lives'} left` : 'No lives left'}</p></div>`;
+    const left = Math.max(0, lives - 1), lost = Math.max(1, lives - left);
+    const quips = ['The beat goes on.', 'Run it back.', 'Shake it off. Next take.', 'Off beat. Try again.', 'That one hurt.'];
+    html = challenge ? `<div class="koflash"></div><div class="banner ko"><div class="scan"></div><div class="tag">WEEKLY CHALLENGE</div><h2>TANK DESTROYED</h2><p>${fmtTime(missionTime)}</p></div>`
+      : `<div class="koflash"></div><div class="banner ko"><div class="scan"></div><div class="tag">MISSION ${mission + 1}</div><h2>${net.connected ? 'BOTH TANKS DOWN' : 'TANK DESTROYED'}</h2>
+      <div class="hearts2">${'♥'.repeat(left)}<span class="lost">${'♥'.repeat(lost)}</span></div>
+      <p>${left > 0 ? `${left} ${left === 1 ? 'life' : 'lives'} left · ${quips[(mission + attempt) % quips.length]}` : 'No lives left'}</p></div>`;
   } else if (state === 'over' || state === 'win') {
     const reached = state === 'win' ? LEVELS.length : mission + 1;
     html = `<div class="panel">
@@ -2348,7 +2408,34 @@ function drawDark() {
   if (mechanic() === 'lava') for (let i = 0; i < grid.length; i++) if (grid[i] === 3) hole((i % COLS) * TILE + 20, Math.floor(i / COLS) * TILE + 20, 44, 0.6);
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(dark, 0, 0); ctx.restore();
 }
+function drawBelts() {
+  if (!currents.length || !grid) return;
+  const off = ((time * 58) % 40 + 40) % 40;
+  for (const c of currents) {
+    ctx.save(); ctx.beginPath();
+    for (let r = c.y0; r < c.y1; r++) for (let cx = 0; cx < COLS; cx++) if (!grid[r * COLS + cx] && !moverSet().has(r * COLS + cx)) ctx.rect(cx * TILE, r * TILE, TILE, TILE);
+    ctx.clip();
+    const y0 = c.y0 * TILE, h = (c.y1 - c.y0) * TILE, d = c.dir;
+    // belt slats sliding along
+    ctx.fillStyle = 'rgba(160,230,255,.07)';
+    for (let x = -40 + off * d; x < W + 40; x += 20) ctx.fillRect(x, y0 + 5, 9, h - 10);
+    // chevrons riding the belt
+    ctx.strokeStyle = 'rgba(170,235,255,.45)'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const o2 = ((time * 58 * d) % 80 + 80) % 80;
+    for (let x = -80 + o2; x < W + 80; x += 80) for (let r = c.y0; r < c.y1; r++) {
+      const y = r * TILE + 20, k = d * 7;
+      ctx.beginPath(); ctx.moveTo(x - k, y - 8); ctx.lineTo(x + k, y); ctx.lineTo(x - k, y + 8); ctx.stroke();
+    }
+    // rollers at both ends
+    ctx.restore();
+    for (const ex of [0, W]) for (let r = c.y0; r < c.y1; r++) {
+      ctx.save(); ctx.translate(ex + (ex ? -6 : 6), r * TILE + 20); ctx.rotate(time * 4 * d);
+      ctx.strokeStyle = 'rgba(170,235,255,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.moveTo(-5, 0); ctx.lineTo(5, 0); ctx.stroke(); ctx.restore();
+    }
+  }
+}
 function drawExtras() {
+  drawBelts();
   drawMovers();
   // flickering walls
   if (flick) for (const i of flick.tiles) {
@@ -2493,12 +2580,13 @@ function drawBg() {
   b.strokeStyle = th.line; b.lineWidth = 1;
   for (let x = 0; x <= W; x += TILE) { b.beginPath(); b.moveTo(x + .5, 0); b.lineTo(x + .5, H); b.stroke(); }
   for (let y = 0; y <= H; y += TILE) { b.beginPath(); b.moveTo(0, y + .5); b.lineTo(W, y + .5); b.stroke(); }
-  // ---- currents
+  // ---- currents (conveyor belts): the belt bed is static, the moving parts are drawn every frame
   currents = makeCurrents();
   for (const c of currents) {
-    b.fillStyle = 'rgba(120,220,255,.07)'; b.fillRect(0, c.y0 * TILE, W, (c.y1 - c.y0) * TILE);
-    b.strokeStyle = 'rgba(160,230,255,.22)'; b.lineWidth = 2;
-    for (let x = 20; x < W; x += 60) for (let r = c.y0; r < c.y1; r++) { const y = r * TILE + 20, d = c.dir * 7; b.beginPath(); b.moveTo(x - d, y - 7); b.lineTo(x + d, y); b.lineTo(x - d, y + 7); b.stroke(); }
+    const y0 = c.y0 * TILE, h = (c.y1 - c.y0) * TILE;
+    b.fillStyle = 'rgba(8,30,44,.75)'; b.fillRect(0, y0, W, h);
+    b.fillStyle = 'rgba(160,230,255,.28)'; b.fillRect(0, y0, W, 2); b.fillRect(0, y0 + h - 2, W, 2);
+    b.fillStyle = 'rgba(0,0,0,.35)'; b.fillRect(0, y0 + 2, W, 3); b.fillRect(0, y0 + h - 5, W, 3);
   }
   // ---- pits
   for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
