@@ -36,7 +36,8 @@
   #tlm{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:12px}
   #tlm a{color:var(--accent,#bef264);text-decoration:none}
   #tlm a:hover{text-decoration:underline}
-  .panel{pointer-events:auto;cursor:default;background:rgba(9,9,11,.94);border:1px solid var(--line);border-radius:20px;padding:30px 38px;text-align:center;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.7);backdrop-filter:blur(6px)}
+  .panel{pointer-events:auto;cursor:default;position:relative;background:linear-gradient(180deg,rgba(20,22,24,.96),rgba(8,8,10,.97)) padding-box,linear-gradient(160deg,rgba(52,211,153,.55),rgba(255,255,255,.06) 35%,rgba(255,255,255,.04) 65%,rgba(253,224,71,.45)) border-box;border:1px solid transparent;border-radius:22px;padding:30px 38px;text-align:center;max-width:560px;box-shadow:0 24px 70px rgba(0,0,0,.75),0 0 60px rgba(52,211,153,.06);backdrop-filter:blur(8px)}
+  .panel:before{content:"";position:absolute;left:15%;right:15%;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(190,242,100,.8),transparent);pointer-events:none}
   .panel h1{margin:0 0 2px;font-size:46px;font-weight:800;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   .panel h2{margin:0 0 10px;font-size:28px;font-weight:800;letter-spacing:.05em;color:var(--txt)}
   .panel p{margin:8px 0;line-height:1.5;color:#d4d4d8}
@@ -72,6 +73,28 @@
   .chip i{width:12px;height:12px;border-radius:4px;display:inline-block;border:1px solid rgba(255,255,255,.25)}
   .chip .new{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:11px;font-weight:800;letter-spacing:.05em}
   .stats{margin:12px 0;font-size:15px;color:#d4d4d8}
+  .over-h{font-size:42px!important;letter-spacing:.12em!important;margin-bottom:4px!important;background:linear-gradient(180deg,#fff 30%,#a1a1aa);-webkit-background-clip:text;background-clip:text;color:transparent!important}
+  .over-h.win{background:var(--grad);-webkit-background-clip:text;background-clip:text}
+  .chips{display:flex;gap:8px;justify-content:center;margin:14px 0 6px;flex-wrap:wrap}
+  .chip{min-width:96px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}
+  .chip b{display:block;font-size:22px;color:#fff;font-weight:800;line-height:1.1}
+  .chip span{font-size:10px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+  .chip.hi{border-color:rgba(190,242,100,.45);background:rgba(190,242,100,.06)}
+  .chip.hi b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .bestline{font-size:12px;color:var(--muted);margin-top:4px}
+  .bestline .new{color:#fde047;font-weight:800;letter-spacing:.1em}
+  .beatc{display:flex;align-items:center;gap:14px;text-align:left;margin:16px auto 0;max-width:420px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+  .beatc .vin{flex:none;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle,#0a0a0c 0 6%,transparent 7%),radial-gradient(circle,transparent 0 22%,#0a0a0c 23%),var(--grad);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 8px 20px rgba(0,0,0,.6);position:relative;animation:npSpin 4s linear infinite}
+  .beatc .vin:after{content:"";position:absolute;inset:0;border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 22%,rgba(10,10,12,.95) 22% 100%),conic-gradient(from 0deg,transparent 0 40deg,rgba(255,255,255,.12) 60deg,transparent 80deg);mask:radial-gradient(circle,transparent 0 23%,#000 24%)}
+  .beatc .bi{flex:1;min-width:0}
+  .beatc .bl{font-size:10px;letter-spacing:.2em;color:var(--em,#34d399);text-transform:uppercase;font-weight:700}
+  .beatc .bt{font-size:19px;font-weight:800;color:#fff;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .beatc .bp{font-size:12px;color:var(--muted)}
+  .beatc .ba{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .beatc .ba .lic{padding:8px 14px;font-size:12.5px}
+  .beatc .ba .btn2{margin:0;padding:7px 12px;font-size:12.5px}
+  .endrow{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+  .endrow .btn2{margin:0}
   .small{font-size:12px;color:var(--dim)}
   .panel a,.banner a,#np a{color:var(--em);text-decoration:none}
   .beat{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:13px}
@@ -81,6 +104,24 @@
   .lic,.panel a.lic,.card a.lic{display:inline-block;background:var(--grad);color:#18181b;font-weight:800;text-decoration:none;border-radius:999px;padding:9px 18px;font-size:13px;letter-spacing:.03em;box-shadow:0 6px 18px rgba(16,185,129,.25)}
   .code{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:24px;font-weight:800;letter-spacing:.12em;color:var(--txt);background:#000;border:1px dashed var(--em);border-radius:12px;padding:8px 18px;margin:8px 0}
   .signup{display:flex;gap:6px;justify-content:center;margin-top:12px}
+  .joinbox{margin:14px auto 4px;max-width:420px;padding:14px 16px 12px;border-radius:16px;background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(253,224,71,.08));border:1px solid rgba(190,242,100,.45);box-shadow:0 0 28px rgba(52,211,153,.12),inset 0 1px 0 rgba(255,255,255,.06)}
+  .joinbox .jb-h{font-weight:800;font-size:15px;color:#fff;letter-spacing:.01em}
+  .joinbox .jb-s{font-size:12px;color:#cbd5c0;margin-top:3px}
+  .joinbox .signup{margin-top:10px}
+  .joinbox .signup input{background:#0d0f0e;border:1px solid rgba(190,242,100,.55);color:#fff;font-size:14px;padding:10px 16px;flex:1;min-width:0;width:auto}
+  .joinbox .signup input::placeholder{color:#9ca39a}
+  .joinbox .signup input:focus{border-color:#bef264;box-shadow:0 0 0 3px rgba(190,242,100,.18)}
+  .joinbox .signup .btn{margin:0;padding:10px 22px;font-size:14px}
+  .jb-msg{font-size:12.5px;margin-top:8px;min-height:0;border-radius:10px;transition:.2s}
+  .jb-msg:empty{margin:0}
+  .jb-msg.err{color:#fde68a;background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.35);padding:7px 10px}
+  .jb-msg.err:before{content:"!";display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#facc15;color:#111;font-weight:900;font-size:11px;margin-right:7px;vertical-align:-3px}
+  .jb-msg.info{color:#cbd5c0}
+  .jb-msg.ok{color:#d9f99d;font-weight:700;font-size:14px;padding:4px 0}
+  .joinbox.done{border-color:rgba(190,242,100,.8);box-shadow:0 0 36px rgba(190,242,100,.2)}
+  .signup.shake{animation:jbShake .4s}
+  .signup.shake input{border-color:#facc15!important;box-shadow:0 0 0 3px rgba(250,204,21,.18)!important}
+  @keyframes jbShake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
   .signup input{background:#000;border:1px solid var(--line2);border-radius:999px;color:var(--txt);padding:8px 14px;font:inherit;font-size:13px;width:210px;outline:none}
   .signup input:focus{border-color:var(--em)}
   #np{position:absolute;left:10px;bottom:10px;box-sizing:border-box;background:linear-gradient(135deg,rgba(18,18,22,.94),rgba(9,9,11,.94));border:1px solid var(--line2);border-radius:999px;padding:5px 14px 5px 6px;font-size:12px;color:var(--muted);display:none;pointer-events:auto;cursor:default;max-width:70%;white-space:nowrap;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.45)}
@@ -102,14 +143,18 @@
   #np:not(.side) .lbl{display:none}
   #np:not(.side) .ttl,#np:not(.side) .pr{display:inline}
   #np:not(.side) .ttl:after{content:" · ";color:var(--muted);font-weight:400}
-  body.npside #np{position:absolute;top:50%;bottom:auto;left:calc(100% + 18px);transform:translateY(-50%);width:210px;max-width:none;border-radius:20px;padding:18px 16px;white-space:normal;text-align:center}
-  body.npside #np .npw{flex-direction:column;gap:12px}
-  body.npside #np .rec{width:118px;height:118px;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 30px rgba(0,0,0,.7),0 0 40px rgba(52,211,153,.12)}
-  body.npside #np .ttl{font-size:16px;white-space:normal;line-height:1.25;margin-top:4px}
-  body.npside #np .pr{white-space:normal;line-height:1.6;margin-top:4px}
+  body.npside #np{position:absolute;top:0;bottom:0;left:calc(100% + 16px);transform:none;width:214px;max-width:none;border-radius:18px;padding:20px 16px;white-space:normal;text-align:center;display:flex!important;flex-direction:column;justify-content:center;background:linear-gradient(180deg,rgba(22,24,26,.96),rgba(10,10,12,.96));border:1px solid rgba(255,255,255,.08);overflow:hidden}
+  body.npside #np:before{content:"";position:absolute;inset:-40% -40% auto;height:70%;background:radial-gradient(closest-side,rgba(52,211,153,.18),transparent);pointer-events:none}
+  body.npside #np .npw{flex-direction:column;gap:14px;position:relative}
+  body.npside #np .rec{width:min(150px,22vh);height:min(150px,22vh);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 14px 36px rgba(0,0,0,.75),0 0 50px rgba(52,211,153,.14)}
+  body.npside #np .ttl{font-size:18px;white-space:normal;line-height:1.25;margin-top:6px}
+  body.npside #np .pr{white-space:normal;line-height:1.6;margin-top:2px;font-size:12px}
   body.npside #np .lbl{justify-content:center}
-  body.npside #np .links{display:flex;gap:6px;justify-content:center;margin-top:10px}
-  body.npside #np .links a{border:1px solid var(--line2);border-radius:999px;padding:5px 10px;font-size:11px}
+  body.npside #np .links{display:flex;gap:6px;justify-content:center;margin-top:12px}
+  body.npside #np .links a{flex:1;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:8px 6px;font-size:12px;font-weight:700;color:#fff;text-decoration:none}
+  body.npside #np .links a:last-child{background:var(--grad);color:#0a0a0a;border:0}
+  body.npside #np .where{font-size:10px;letter-spacing:.2em;color:var(--muted);margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)}
+  body.npside #np .tl{display:block;margin-top:8px;font-size:12px;color:var(--em,#34d399);text-decoration:none}
   #np b{color:var(--txt)}
   body:not(.touch):not(.npside) #np{top:calc(100% + 7px);bottom:auto;left:50%;transform:translateX(-50%);max-width:100%;padding:3px 14px 3px 4px}
   body:not(.touch):not(.npside) #np .rec{width:22px;height:22px}
@@ -588,7 +633,9 @@ function fit() {
     wrapEl.style.width = vw + 'px'; wrapEl.style.height = vh + 'px';
     wrapEl.style.right = 'auto'; wrapEl.style.bottom = 'auto';
   }
-  const maxW = vw - (touchMode ? 4 : 24), maxH = vh - (touchMode ? 4 : 30 + 8 + 24 + 54);
+  // computers: the beat card sits to the right of the arena when the window is wide enough; otherwise a strip below
+  const SIDE = 246, side = !touchMode && vw >= 880;
+  const maxW = vw - (touchMode ? 4 : 24) - (side ? SIDE : 0), maxH = vh - (touchMode ? 4 : 30 + 8 + 24 + (side ? 0 : 54));
   const s = Math.max(0.3, Math.min(maxW / VW, maxH / VH));
   const cw = Math.floor(VW * s), ch = Math.floor(VH * s);
   canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
@@ -596,7 +643,11 @@ function fit() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
   scale = canvas.width / VW;
-  if (document.body && document.body.classList) { document.body.classList.toggle('npside', !touchMode && (vw - cw) / 2 >= 250); try { if (hud.np) updateNowPlaying(); } catch (e) {} }
+  if (document.body && document.body.classList) {
+    document.body.classList.toggle('npside', side);
+    if (wrapEl && wrapEl.style && !touchMode) wrapEl.style.paddingRight = side ? SIDE + 'px' : '0px';
+    try { if (hud.np) updateNowPlaying(); } catch (e) {}
+  }
   // phones: use the empty space beside the arena for the HUD and now-playing card
   if (document.documentElement && document.documentElement.style && document.body && document.body.classList) {
     const rail = Math.max(0, (vw - cw) / 2);
@@ -859,12 +910,15 @@ const music = (() => {
       playing = true;
       const buf = customBeat || beatBuf();
       if (buf) {
-        if (buf !== lastBuf) { beatOffset = 0; lastBuf = buf; }
-        beatGain = ac.createGain(); beatGain.gain.value = 0.85; beatGain.connect(dest());
+        const fresh = buf !== lastBuf;
+        if (fresh) { beatOffset = 0; lastBuf = buf; }
+        // fade in: slow for a new beat, quick when the same beat resumes
+        const t0 = ac.currentTime + 0.03, fin = fresh || beatOffset === 0 ? 1.6 : 0.35;
+        beatGain = ac.createGain(); beatGain.gain.setValueAtTime(0.0001, t0); beatGain.gain.exponentialRampToValueAtTime(0.85, t0 + fin); beatGain.connect(dest());
         beatSrc = ac.createBufferSource(); beatSrc.buffer = buf; beatSrc.loop = true;
         beatSrc.connect(beatGain);
         if (beatOffset >= buf.duration) beatOffset = 0;
-        beatSrc.start(ac.currentTime + 0.03, beatOffset); beatStarted = ac.currentTime + 0.03;
+        beatSrc.start(t0, beatOffset); beatStarted = t0;
         return;
       }
       bus(); sat();
@@ -880,7 +934,10 @@ const music = (() => {
       playing = false; if (timer) clearInterval(timer); timer = null;
       if (beatSrc) {
         beatOffset = (beatOffset + Math.max(0, ac.currentTime - beatStarted)) % beatSrc.buffer.duration;
-        try { beatGain.gain.setValueAtTime(beatGain.gain.value, ac.currentTime); beatGain.gain.linearRampToValueAtTime(0, ac.currentTime + 0.1); beatSrc.stop(ac.currentTime + 0.12); } catch (e) {}
+        // fade the old beat out under whatever comes next instead of cutting it
+        let fo = 1.4; try { if (state === 'paused') fo = 0.25; } catch (e) {}
+        const t = ac.currentTime;
+        try { beatGain.gain.cancelScheduledValues(t); beatGain.gain.setValueAtTime(Math.max(0.0001, beatGain.gain.value), t); beatGain.gain.exponentialRampToValueAtTime(0.0001, t + fo); beatSrc.stop(t + fo + 0.05); } catch (e) {}
         beatSrc = null;
       }
     },
@@ -952,7 +1009,7 @@ let tanks = [], shells = [], mines = [], parts = [], treads = [], scorches = [];
 let player = null, player2 = null, me = null, attempt = 0, gridV = 0, nextId = 1, netEvents = [], lostMsg = '', inviteCode = '';
 let runStart = 0, board = null, boardAvail = false, boardReturn = 'title', postState = 'idle', boardRank = null;
 let levelAlive = [], mission = 0, lives = 3, score = 0, kills = 0, missionKills = {};
-let state = 'title', stateT = 0, shake = 0, time = 0, best = 0;
+let state = 'title', stateT = 0, shake = 0, time = 0, best = 0, fadeIn = 0;
 try { best = parseInt(localStorage.getItem('rt_best') || '0', 10) || 0; } catch (e) {}
 
 const tileAt = (cx, cy) => (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) ? 1 : grid[cy * COLS + cx];
@@ -1061,7 +1118,7 @@ function updateNowPlaying() {
   const name = customBeat ? customName : w.beat, side = !!(document.body && document.body.classList && document.body.classList.contains('npside'));
   const links = customBeat ? '' : `${w.uuid ? '<a href="#" data-np="save">♥ Save</a>' : ''}${w.uuid ? (side ? '' : ' · ') : ''}<a href="${esc(w.link)}" target="_blank" rel="noopener">License</a>`;
   const label = !loaded ? 'LOADING' : on ? 'NOW PLAYING' : 'MUSIC OFF';
-  const key = [name, label, side, links].join('|');
+  const key = [name, label, side, links, state, mission, tracklist.items.length].join('|');
   hud.np.style.display = 'block';
   hud.np.classList.toggle('side', side);
   if (hud.np._k === key) return;
@@ -1070,7 +1127,9 @@ function updateNowPlaying() {
     <div class="lbl">${label}<span class="eq${on ? ' on' : ''}"><i></i><i></i><i></i><i></i></span></div>
     <div class="ttl">${side ? '' : (on ? '♪ ' : '')}${esc(name)}</div>
     <div class="pr">${esc(customBeat ? BRAND.tag : (w.prod || BRAND.tag))}${side ? '' : (links ? ' · ' + links : '')}</div>
-    ${side && links ? `<div class="links">${links}</div>` : ''}</div></div>`;
+    ${side && links ? `<div class="links">${links}</div>` : ''}
+    ${side && !customBeat && ['intro', 'play', 'paused', 'cleared', 'dead'].includes(state) ? `<div class="where">${challenge ? 'WEEKLY CHALLENGE' : `MISSION ${mission + 1} · ${esc(curTheme().name.toUpperCase())}`}</div>` : ''}
+    ${side && tracklist.items.length ? `<a href="#" class="tl" data-np="tracks">♪ Your tracklist (${tracklist.items.length})</a>` : ''}</div></div>`;
 }
 let unlocked = [];
 try { unlocked = JSON.parse(localStorage.getItem('jt_codes') || '[]'); } catch (e) { unlocked = []; }
@@ -1088,6 +1147,7 @@ function newMission() {
 }
 
 function startAttempt(fresh) {
+  fadeIn = fresh ? 0.75 : 0.35;
   if (!fresh) missionDeaths++;
   missionTime = 0; missionShots = 0;
   buildGrid();
@@ -1480,8 +1540,9 @@ function beatSection() {
 function beatCard(label) {
   if (customBeat) return '';
   const w = curBeat();
-  return `<div class="card">${label || 'World ' + (worldOf(mission) + 1) + ' soundtrack'}<div class="bn">♪ ${esc(w.beat)}</div><div class="small" style="margin:-6px 0 8px">${esc(w.prod || BRAND.tag)}</div>
-    <a class="lic" href="${esc(w.link)}" target="_blank" rel="noopener">License this beat · ${esc(BRAND.leasePrice)} lease</a>${w.uuid ? '<div><button class="btn2" data-act="savebeat">♥ Save to my account</button></div>' : ''}</div>`;
+  return `<div class="beatc"><div class="vin"></div><div class="bi"><div class="bl">${label || 'World ' + (worldOf(mission) + 1) + ' soundtrack'}</div>
+    <div class="bt">${esc(w.beat)}</div><div class="bp">${esc(w.prod || BRAND.tag)}</div>
+    <div class="ba"><a class="lic" href="${esc(w.link)}" target="_blank" rel="noopener">License · ${esc(BRAND.leasePrice)} lease</a>${w.uuid ? '<button class="btn2" data-act="savebeat">♥ Save</button>' : ''}</div></div></div>`;
 }
 // ---- tracklist: every beat that played this run, in mission order, saved in the browser
 let tracklist = { at: '', items: [] }, sharedList = null, tracksReturn = 'title';
@@ -1569,7 +1630,8 @@ function codesList() {
 }
 function signupBox() {
   if (!SIGNUP.endpoint && !SIGNUP.url) return '';
-  return `<form class="signup" data-form="signup"><input type="email" name="email" required placeholder="Email for new beats + drops"><button class="btn2" type="submit" style="margin:0">Join</button></form><div class="small" id="signupMsg"></div>`;
+  return `<div class="joinbox"><div class="jb-h">✉ Get new beats + drops first</div><div class="jb-s">New releases, discount codes and exclusives in your inbox. No spam.</div>
+    <form class="signup" data-form="signup" novalidate><input type="email" name="email" placeholder="you@email.com" autocomplete="email" inputmode="email"><button class="btn" type="submit">Join</button></form><div class="jb-msg" id="signupMsg"></div></div>`;
 }
 function renderOverlay() {
   let html = '';
@@ -1652,16 +1714,17 @@ function renderOverlay() {
   } else if (state === 'over' || state === 'win') {
     const reached = state === 'win' ? LEVELS.length : mission + 1;
     html = `<div class="panel">
-      <h2>${state === 'win' ? 'ALL MISSIONS CLEARED' : 'GAME OVER'}</h2>
-      <div class="stats">${state === 'win' ? 'You beat every mission.' : `You reached mission ${reached}.`}<br>Tanks destroyed: <b>${kills}</b> &nbsp; Score: <b>${score}</b></div>
+      <h2 class="over-h${state === 'win' ? ' win' : ''}">${state === 'win' ? 'ALL CLEARED' : 'GAME OVER'}</h2>
+      <p class="small" style="margin:0">${state === 'win' ? 'You beat every mission. Legend.' : `${esc(curTheme().name)} got you this time.`}</p>
+      <div class="chips"><div class="chip${reached >= best ? ' hi' : ''}"><b>${reached}</b><span>Mission</span></div><div class="chip"><b>${kills}</b><span>Tanks hit</span></div><div class="chip"><b>${score.toLocaleString()}</b><span>Score</span></div></div>
       ${state === 'win' && WORLDS[WORLDS.length - 1].code ? `<p>Final world unlocked:</p><div class="code">${esc(WORLDS[WORLDS.length - 1].code)}</div><div><button class="btn2" data-act="copy" data-code="${esc(WORLDS[WORLDS.length - 1].code)}">Copy code</button></div>` : ''}
-      ${best ? `<p class="small">Best: mission ${best}</p>` : ''}
+      ${best ? `<div class="bestline">${reached >= best ? '<span class="new">★ PERSONAL BEST</span> · ' : ''}Best: mission ${best}</div>` : ''}
       ${beatCard(state === 'win' ? 'The beat you finished on' : 'The beat you went down to')}
       ${codesList()}
       ${signupBox()}
       ${leaderboardBox()}
-      <div class="row"><button class="btn2" data-act="share">Share my score</button>${tracklist.items.length ? `<button class="btn2" data-act="tracks">♪ Your tracklist (${tracklist.items.length})</button>` : ''}</div>
-      <button class="btn" data-act="start">Play again</button>
+      <button class="btn" data-act="start" style="margin-top:16px">Play again</button>
+      <div class="endrow"><button class="btn2" data-act="share">↗ Share my score</button>${tracklist.items.length ? `<button class="btn2" data-act="tracks">♪ Your tracklist (${tracklist.items.length})</button>` : ''}</div>
     </div>`;
   } else if (state === 'world') {
     const wi = worldOf(mission) - 1, w = WORLDS[wi], played = curBeat();
@@ -1699,9 +1762,12 @@ overlay.addEventListener('submit', e => {
   const f = e.target.closest('[data-form="signup"]');
   if (!f) return;
   e.preventDefault();
-  const email = f.email.value.trim(), msg = document.getElementById('signupMsg');
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.textContent = 'That email looks off.'; return; }
-  msg.textContent = 'Sending…';
+  const email = f.email.value.trim(), msg = document.getElementById('signupMsg'), box = f.closest('.joinbox');
+  const say = (text, kind) => { msg.textContent = text; msg.className = 'jb-msg ' + (kind || ''); };
+  const nope = text => { say(text, 'err'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); f.email.focus(); };
+  if (!email) { nope('Drop your email in first.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { nope("That email doesn't look right. Check it and try again."); return; }
+  say('Adding you…', 'info');
   const req = SIGNUP.endpoint
     ? fetch(SIGNUP.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, source: 'justron-tanks' }) })
     : fetch(SIGNUP.url.replace(/\/$/, '') + '/rest/v1/' + SIGNUP.table, {
@@ -1709,8 +1775,8 @@ overlay.addEventListener('submit', e => {
     headers: { apikey: SIGNUP.anonKey, Authorization: 'Bearer ' + SIGNUP.anonKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ email, world: worldOf(mission) + 1, mission: mission + 1, source: 'justron-tanks' })
   });
-  req.then(r => { if (!r.ok && r.status !== 409) throw new Error(); f.style.display = 'none'; msg.textContent = "You're on the list."; })
-    .catch(() => { msg.textContent = "Couldn't save that. Try again later."; });
+  req.then(r => { if (!r.ok && r.status !== 409) throw new Error(); if (box) box.classList.add('done'); f.style.display = 'none'; say("✓ You're on the list. New beats and drops are headed your way.", 'ok'); track('tanks_signup'); })
+    .catch(() => say("Couldn't save that right now. Try again in a bit.", 'err'));
 });
 const beatFile = document.getElementById('beatFile');
 beatFile.addEventListener('change', () => {
@@ -2779,6 +2845,8 @@ function render() {
     else if (p.kind === 'ring') { ctx.strokeStyle = `rgba(255,230,180,${k * 0.8})`; ctx.lineWidth = 4 * k + 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.15 - k * 0.8), 0, TAU); ctx.stroke(); }
   }
   if (isDark() && (state === 'play' || state === 'cleared' || state === 'dead' || state === 'paused')) drawDark();
+  // fade up from black at the start of each mission
+  if (fadeIn > 0) { fadeIn = Math.max(0, fadeIn - 1 / 60); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(0,0,0,${Math.min(1, fadeIn / 0.6)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.restore(); }
   // touch aim line
   if (touch.on && touch.aim.active && me && me.alive && state === 'play') {
     const yel = me.type === 'player2';
@@ -3115,6 +3183,8 @@ document.addEventListener('click', e => {
   if (a) track('tanks_license_click', { href: a.getAttribute('href') });
 }, true);
 hud.np.addEventListener('click', e => {
+  const tl = e.target.closest && e.target.closest('[data-np="tracks"]');
+  if (tl) { e.preventDefault(); openTracks(); return; }
   const t = e.target.closest && e.target.closest('[data-np="save"]');
   if (t) { e.preventDefault(); saveCurrentBeat(); }
 });
